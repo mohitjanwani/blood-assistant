@@ -1,0 +1,8 @@
+Django>=4.2
+djangorestframework
+transformers>=4.30
+torch           # or `torch-cpu` if you don't have GPU
+sentence-transformers
+faiss-cpu       # optional fast vector search (or use numpy)
+python-dotenv
+gunicorn        # optional for deployment

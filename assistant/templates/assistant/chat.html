@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Assistant AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* Typing Animation (Three Dots) */
+        .typing-dot {
+            animation: typing 1.4s infinite ease-in-out both;
+            background-color: #9CA3AF;
+            border-radius: 50%;
+            height: 6px;
+            width: 6px;
+            display: inline-block;
+            margin: 0 2px;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes typing {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 h-screen flex flex-col">
+
+    <header class="bg-white shadow-sm p-4 z-10">
+        <div class="max-w-4xl mx-auto flex justify-center items-center">
+            <div class="flex items-center gap-2">
+                <span class="material-icons text-red-600 text-3xl">bloodtype</span>
+                <h1 class="text-xl font-bold text-gray-800">Blood Assistant AI</h1>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4" id="chat-container">
+        <div class="max-w-4xl mx-auto space-y-6" id="chatbox">
+
+            <div class="flex gap-4">
+                <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                    <span class="material-icons text-red-600 text-sm">smart_toy</span>
+                </div>
+                <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm max-w-[80%]">
+                    <p class="text-gray-800">Hello! I am your AI Blood Assistant. I can understand many languages. Ask
+                        me anything about blood, health, or medical tests!</p>
+                    <button onclick="speakText(this.previousElementSibling.textContent)"
+                        class="text-gray-400 hover:text-red-500 mt-1">
+                        <span class="material-icons text-lg align-bottom">volume_up</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+        <div id="scroll-anchor"></div>
+    </main>
+
+    <footer class="bg-white border-t p-4">
+        <div class="max-w-4xl mx-auto relative">
+
+            <div id="loading-controls"
+                class="hidden absolute -top-12 left-1/2 transform -translate-x-1/2 bg-white border shadow-md rounded-full px-4 py-1 flex items-center gap-2 text-sm">
+                <div class="flex">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                <span class="text-gray-500 ml-2">Generating...</span>
+                <button onclick="stopGeneration()" class="ml-2 text-red-500 hover:text-red-700 font-bold border-l pl-2">
+                    <span class="material-icons text-sm align-middle">stop_circle</span> Stop
+                </button>
+            </div>
+
+            <div
+                class="flex gap-2 items-end bg-gray-50 border rounded-xl p-2 focus-within:ring-2 focus-within:ring-red-200 transition-all">
+
+                <button id="voice-btn" onclick="toggleVoice()"
+                    class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors">
+                    <span class="material-icons" id="mic-icon">mic</span>
+                </button>
+
+                <textarea id="question" rows="1"
+                    class="flex-1 bg-transparent border-none focus:ring-0 resize-none py-3 max-h-32"
+                    placeholder="Ask a medical question..."></textarea>
+
+                <button id="send-btn" onclick="sendQuestion()"
+                    class="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50">
+                    <span class="material-icons">send</span>
+                </button>
+            </div>
+            <p class="text-center text-xs text-gray-400 mt-2">AI can make mistakes. Check important medical info.</p>
+        </div>
+    </footer>
+
+    <script>
+        const chatBox = document.getElementById('chatbox');
+        const scrollAnchor = document.getElementById('scroll-anchor');
+        const questionInput = document.getElementById('question');
+        const loadingControls = document.getElementById('loading-controls');
+        const micIcon = document.getElementById('mic-icon');
+
+        let abortController = null;
+        let isRecording = false;
+        let recognition = null;
+        let detectedLanguage = 'en-US'; // Default language
+
+        // --- 1. Text-to-Speech (Audio Answer) ---
+        function speakText(text, lang = 'en-US') {
+            if ('speechSynthesis' in window) {
+                // Try to use the detected language for the voice
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices();
+
+                // Find a voice that matches the detected language
+                const voice = voices.find(v => v.lang.startsWith(lang.substring(0, 2)));
+                if (voice) {
+                    utterance.voice = voice;
+                } else {
+                    // Fallback to default if a specific voice is not found
+                    utterance.lang = lang;
+                }
+
+                window.speechSynthesis.cancel(); // Stop any current speech
+                window.speechSynthesis.speak(utterance);
+            } else {
+                console.warn("Text-to-Speech not supported in this browser.");
+            }
+        }
+
+        // --- 2. Auto-Resize Textarea ---
+        questionInput.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // --- 3. Voice Recognition Setup (Dynamic Language) ---
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'auto'; // Attempt to detect language automatically
+
+            recognition.onstart = () => {
+                isRecording = true;
+                micIcon.textContent = 'mic_off';
+                micIcon.parentElement.classList.add('bg-red-100', 'text-red-600');
+                questionInput.placeholder = "Listening...";
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                micIcon.textContent = 'mic';
+                micIcon.parentElement.classList.remove('bg-red-100', 'text-red-600');
+                questionInput.placeholder = "Ask a medical question...";
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                const lang = event.results[0][0].lang || 'en-US'; // Get detected language from speech result
+
+                detectedLanguage = lang; // Store the detected language
+                questionInput.value = transcript;
+                questionInput.focus();
+
+                // You can optionally send the question automatically after speech recognition stops
+                // sendQuestion(); 
+            };
+        } else {
+            document.getElementById('voice-btn').style.display = 'none';
+        }
+
+        function toggleVoice() {
+            if (!recognition) return;
+
+            if (isRecording) recognition.stop();
+            else recognition.start();
+        }
+
+        // --- 4. Chat Logic & Controls ---
+
+        function stopGeneration() {
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+                loadingControls.classList.add('hidden');
+                appendMessage("System", "Generation stopped by user.", "text-red-500 italic");
+            }
+        }
+
+        function editPrompt(text) {
+            questionInput.value = text;
+            questionInput.focus();
+            questionInput.style.height = 'auto';
+            questionInput.style.height = (questionInput.scrollHeight) + 'px';
+        }
+
+        async function sendQuestion() {
+            const q = questionInput.value.trim();
+            if (!q) return;
+
+            // Simple language detection for text input if voice wasn't used
+            // This is basic and not always accurate, but helps the TTS
+            if (q && q.match(/[\u0900-\u097F]/)) { // Detect basic Hindi/Devanagari script
+                detectedLanguage = 'hi-IN';
+            } else if (q && q.match(/[\u00C0-\u017F]/)) { // Detect basic accents for European languages
+                detectedLanguage = 'es-ES';
+            } else {
+                detectedLanguage = 'en-US';
+            }
+
+
+            // UI Updates
+            appendMessage('You', q);
+            questionInput.value = '';
+            questionInput.style.height = 'auto';
+            loadingControls.classList.remove('hidden');
+            scrollAnchor.scrollIntoView({ behavior: 'smooth' });
+
+            abortController = new AbortController();
+
+            try {
+                const response = await fetch('/api/chat/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // Note: If you face 403 error, uncomment the CSRF token
+                        // 'X-CSRFToken': getCookie('csrftoken') 
+                    },
+                    body: JSON.stringify({ question: q }),
+                    signal: abortController.signal
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+                // Pass the detected language to the append function
+                appendMessage('Assistant', data.answer, 'text-gray-800', data.confidence, detectedLanguage);
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Fetch aborted');
+                } else {
+                    appendMessage('Error', 'Something went wrong. Please check your server and internet connection.', 'text-red-600');
+                }
+            } finally {
+                loadingControls.classList.add('hidden');
+                abortController = null;
+                scrollAnchor.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function appendMessage(sender, text, colorClass = 'text-gray-800', confidence = null, lang = 'en-US') {
+            const isUser = sender === 'You';
+
+            let html = '';
+            if (isUser) {
+                // User Message (Right Side)
+                html = `
+                <div class="flex gap-4 justify-end group">
+                    <div class="bg-blue-600 text-white p-4 rounded-2xl rounded-tr-none shadow-sm max-w-[80%] relative">
+                        <p>${text}</p>
+                        <button onclick="editPrompt('${text.replace(/'/g, "\\'")}')" class="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600" title="Edit">
+                            <span class="material-icons text-sm">edit</span>
+                        </button>
+                    </div>
+                    <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0 text-xs font-bold text-blue-600">
+                        ME
+                    </div>
+                </div>`;
+            } else {
+                // AI Message (Left Side)
+                // Added a speaker icon button to trigger Text-to-Speech
+                html = `
+                <div class="flex gap-4">
+                    <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                        <span class="material-icons text-red-600 text-sm">smart_toy</span>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm max-w-[80%] border border-gray-100">
+                        <p class="${colorClass}">${text}</p>
+                        <div class="flex justify-between items-center mt-2">
+                             <button onclick="speakText('${text.replace(/'/g, "\\'")}', '${lang}')" class="text-gray-400 hover:text-red-500">
+                                <span class="material-icons text-lg align-bottom">volume_up</span> Listen
+                            </button>
+                            ${confidence ? `<div class="text-xs text-gray-400">Confidence: ${(confidence * 100).toFixed(0)}%</div>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }
+            chatBox.insertAdjacentHTML('beforeend', html);
+        }
+
+        // Allow "Enter" to send
+        questionInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendQuestion();
+            }
+        });
+    </script>
+</body>
+
+</html>
