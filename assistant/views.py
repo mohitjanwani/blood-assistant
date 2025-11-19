@@ -88,10 +88,17 @@ def chat_api(request):
 
             # 2. Ask the model to generate an answer
             # We add a prompt prefix to help the model understand its role
-            prompt = f"Answer the following question concisely in the same language it was asked: {question}"
+            prompt = f"Provide a brief, factual, and accurate medical explanation for the following question. Respond directly in the same language as the question. QUESTION: {question}"
             
-            results = GENERATOR(prompt, max_length=256, min_length=20, do_sample=False)
-            answer_text = results[0]['generated_text']
+            results = GENERATOR(
+                prompt, 
+                max_length=300, 
+                min_length=15, 
+                do_sample=True,      # FIX 1: Enable sampling
+                temperature=0.7,     # FIX 1: Good balance between creativity and safety
+                top_p=0.9             # FIX 1: Keeps output high quality
+            )
+            answer_text = results[0]['generated_text'].strip()
 
             # 3. Return the answer
             return JsonResponse({
