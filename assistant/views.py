@@ -134,7 +134,7 @@ ELIGIBILITY_QUESTIONS = [
     "Do you have diabetes? (Yes/No)",
     "Do you have anemia or low hemoglobin? (Yes/No)",
     "What is your hemoglobin level? (if known)",
-    "What is your blood pressure?",
+    "What is your blood pressure? (Normal range: 90/60 to 120/80 mmHg)",
     "Did you previously suffer from COVID-19? (Yes/No)",
     "Do you have any allergies? (Yes/No)",
     "If yes, please specify your allergies:",
@@ -271,6 +271,17 @@ def is_valid_blood_pressure(answer: str) -> bool:
     text = answer.strip()
     return any(ch.isdigit() for ch in text)
 
+def is_valid_yes_no_answer(answer: str) -> bool:
+    """
+    Validates that answer is a clear Yes or No response.
+    Accepts: yes, y, no, n (case-insensitive)
+    """
+    if not answer:
+        return False
+    text = answer.strip().lower()
+    valid_responses = ['yes', 'y', 'no', 'n']
+    return text in valid_responses
+
 def check_eligibility(profile):
     """Check blood donation eligibility based on profile"""
     reasons = []
@@ -343,7 +354,8 @@ def check_eligibility(profile):
     
     # COVID-19 (usually 28 days after recovery)
     if profile.had_corona:
-        reasons.append("Note: If you had COVID-19, you should wait at least 28 days after recovery before donating.")
+        eligible = False
+        reasons.append("You must wait at least 28 days after recovery from COVID-19 before donating blood.")
     
     # Medications (depends on type)
     if profile.taking_medications:
@@ -514,11 +526,24 @@ def report_api(request):
                         'total_questions': len(ELIGIBILITY_QUESTIONS)
                     })
 
+                # List of Yes/No questions (question numbers)
+                yes_no_questions = [6, 7, 10, 11, 13, 15, 17, 19, 21, 23, 24, 25]
+                
+                # Validate Yes/No questions strictly
+                if current_question in yes_no_questions and not is_valid_yes_no_answer(answer):
+                    same_question = ELIGIBILITY_QUESTIONS[current_question - 1]
+                    return JsonResponse({
+                        'answer': f"Please answer with 'Yes' or 'No' only.<br><br><b>{same_question}</b>",
+                        'in_question_flow': True,
+                        'question_number': current_question,
+                        'total_questions': len(ELIGIBILITY_QUESTIONS)
+                    })
+
                 # Special validation for blood pressure question (Q9) – must contain numbers
                 if current_question == 9 and not is_valid_blood_pressure(answer):
                     same_question = ELIGIBILITY_QUESTIONS[current_question - 1]
                     return JsonResponse({
-                        'answer': f"Please enter your blood pressure using numbers (for example: 120/80). Text like 'normal' or 'high' is not accepted.<br><br><b>{same_question}</b>",
+                        'answer': f"Please enter your blood pressure using numbers (for example: 120/80). Normal range is 90/60 to 120/80 mmHg.<br><br><b>{same_question}</b>",
                         'in_question_flow': True,
                         'question_number': current_question,
                         'total_questions': len(ELIGIBILITY_QUESTIONS)
@@ -532,8 +557,12 @@ def report_api(request):
                 # --- Conditional skipping logic ---
                 # We loop in case multiple consecutive questions need to be skipped.
                 while current_question <= len(ELIGIBILITY_QUESTIONS):
-                    # Skip pregnancy/breastfeeding questions for males
-                    if current_question in (23, 24):
+                    # Skip pregnancy/breastfeeding questions for males or other genders
+                    if current_question == 23:  # Pregnancy
+                        if profile.gender and 'male' in profile.gender.lower():
+                            current_question += 1
+                            continue
+                    if current_question == 24:  # Breastfeeding
                         if profile.gender and 'male' in profile.gender.lower():
                             current_question += 1
                             continue
@@ -619,7 +648,39 @@ def report_api(request):
     
     return JsonResponse({'error': 'Method Not Allowed'}, status=405)
 
-# --- 7. DOWNLOAD REPORT ---
+# --- 7. RESET ASSESSMENT ---
+@csrf_exempt
+def reset_assessment(request):
+    """Reset the assessment - clear session and delete old profile"""
+    if request.method == 'POST':
+        try:
+            # Clear all session data related to report
+            if 'report_question_flow' in request.session:
+                del request.session['report_question_flow']
+            if 'report_current_question' in request.session:
+                del request.session['report_current_question']
+            if 'health_profile_id' in request.session:
+                old_session_id = request.session['health_profile_id']
+                del request.session['health_profile_id']
+                # Delete old profile from database
+                try:
+                    UserHealthProfile.objects.filter(session_id=old_session_id).delete()
+                except:
+                    pass
+            
+            request.session.save()
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Assessment reset. Ready to start fresh.'
+            })
+        except Exception as e:
+            print(f"Error resetting assessment: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Method Not Allowed'}, status=405)
+
+# --- 8. DOWNLOAD REPORT ---
 def download_report(request, profile_id):
     """Generate and download eligibility report as HTML/PDF"""
     try:

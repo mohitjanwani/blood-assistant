@@ -182,11 +182,18 @@
                 <div class="bg-white p-6 rounded-xl shadow-lg border-2 border-red-200">
                     <h3 class="text-xl font-bold text-gray-800 mb-2">Assessment Complete!</h3>
                     <p class="text-gray-600 mb-4">Your eligibility report is ready to download.</p>
-                    <button id="download-btn" onclick="downloadReport()" 
-                        class="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-lg flex items-center gap-2 mx-auto">
-                        <span class="material-icons">download</span>
-                        Download Report
-                    </button>
+                    <div class="flex flex-col gap-3">
+                        <button id="download-btn" onclick="downloadReport()" 
+                            class="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-lg flex items-center gap-2 mx-auto">
+                            <span class="material-icons">download</span>
+                            Download Report
+                        </button>
+                        <button id="reset-btn" onclick="resetAssessment()" 
+                            class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg flex items-center gap-2 mx-auto">
+                            <span class="material-icons">refresh</span>
+                            Start New Assessment
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -223,7 +230,6 @@
                     <span class="material-icons">send</span>
                 </button>
             </div>
-            <p class="text-center text-xs text-gray-400 mt-2">AI can make mistakes. Check important medical info.</p>
         </div>
     </footer>
 
@@ -251,6 +257,7 @@
         let reportQuestionFlow = false;
         let reportCurrentQuestion = 0;
         let reportTotalQuestions = 26;
+        let assessmentComplete = false;
 
         // Tab Switching
         function switchTab(tab) {
@@ -342,6 +349,12 @@
             const q = questionInput.value.trim();
             if (!q) return;
 
+            // Prevent sending if assessment is complete
+            if (assessmentComplete && currentTab === 'report') {
+                alert('Assessment is complete. Click "Start New Assessment" to begin again.');
+                return;
+            }
+
             if (q.match(/[\u0900-\u097F]/)) detectedLanguage = 'hi-IN';
             else if (q.match(/[\u00C0-\u017F]/)) detectedLanguage = 'es-ES';
             else detectedLanguage = 'en-US';
@@ -417,6 +430,7 @@
                 } else if (data.completed) {
                     reportQuestionFlow = false;
                     reportCurrentQuestion = 0;
+                    assessmentComplete = true;
                     currentProfileId = data.profile_id;
                     updateProgress(100, 100);
                     appendMessage(reportBox, 'Assistant', data.answer, 'text-gray-800', null, detectedLanguage);
@@ -437,6 +451,8 @@
                         </div>`, 
                         'text-gray-800');
                     
+                    // Disable input and show reset button
+                    disableInputField();
                     downloadSection.classList.remove('hidden');
                     reportScrollAnchor.scrollIntoView({ behavior: 'smooth' });
                 }
@@ -464,6 +480,74 @@
             if (currentProfileId) {
                 window.open(`/download-report/${currentProfileId}/`, '_blank');
             }
+        }
+
+        // Reset Assessment
+        async function resetAssessment() {
+            try {
+                const response = await fetch('/api/reset/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) throw new Error('Failed to reset assessment');
+                const data = await response.json();
+
+                // Clear UI
+                reportBox.innerHTML = '';
+                downloadSection.classList.add('hidden');
+                reportProgress.classList.add('hidden');
+                assessmentComplete = false;
+                reportQuestionFlow = false;
+                reportCurrentQuestion = 0;
+                currentProfileId = null;
+
+                // Show welcome message
+                const welcomeHtml = `
+                <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                        <span class="material-icons text-blue-600">assignment</span>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl rounded-tl-none shadow-md max-w-[80%] border border-gray-100">
+                        <p class="text-gray-800 font-semibold mb-2">Blood Donation Eligibility Assessment</p>
+                        <p class="text-gray-600 text-sm">I'll ask you a series of questions to assess your eligibility for blood donation. This will help generate a comprehensive report.</p>
+                        <button onclick="startReport()" 
+                            class="mt-4 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-2 rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md flex items-center gap-2">
+                            <span class="material-icons text-sm">play_arrow</span>
+                            Start Assessment
+                        </button>
+                    </div>
+                </div>
+                `;
+                reportBox.innerHTML = welcomeHtml;
+
+                // Re-enable input
+                enableInputField();
+
+                console.log('Assessment reset successfully');
+            } catch (error) {
+                console.error('Error resetting assessment:', error);
+                alert('Failed to reset assessment. Please try again.');
+            }
+        }
+
+        // Disable Input Field
+        function disableInputField() {
+            questionInput.disabled = true;
+            questionInput.classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('send-btn').disabled = true;
+            document.getElementById('voice-btn').disabled = true;
+            document.getElementById('voice-btn').classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        // Enable Input Field
+        function enableInputField() {
+            questionInput.disabled = false;
+            questionInput.classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('send-btn').disabled = false;
+            document.getElementById('voice-btn').disabled = false;
+            document.getElementById('voice-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+            questionInput.focus();
         }
 
         // Update Progress
