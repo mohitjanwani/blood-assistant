@@ -271,6 +271,74 @@ def is_valid_blood_pressure(answer: str) -> bool:
     text = answer.strip()
     return any(ch.isdigit() for ch in text)
 
+
+def validate_answer(question_num: int, answer: str, profile: UserHealthProfile):
+    """
+    Per-question validation.
+    Returns (is_valid: bool, error_message_html: str | None).
+    If not valid, we DO NOT advance to next question and re-ask the same one.
+    """
+    same_question = ELIGIBILITY_QUESTIONS[question_num - 1]
+    text = (answer or "").strip().lower()
+
+    # Normalize simple yes/no patterns
+    yes_values = {"yes", "y", "true", "1"}
+    no_values = {"no", "n", "false", "0"}
+
+    # Helper to check and fail for strictly-yes-no questions
+    def require_yes_no(extra_hint: str = ""):
+        if text in yes_values or text in no_values:
+            return True, None
+        hint = "Please answer with <b>Yes</b> or <b>No</b> only."
+        if extra_hint:
+            hint += f" {extra_hint}"
+        return False, f"{hint}<br><br><b>{same_question}</b>"
+
+    # Q2: Age – must be a number
+    if question_num == 2:
+        if not re.search(r"\d+", text):
+            return False, f"Please enter your age as a number (for example: 25). Text descriptions are not accepted.<br><br><b>{same_question}</b>"
+        return True, None
+
+    # Q3: Weight – must be a number
+    if question_num == 3:
+        if not re.search(r"\d+\.?\d*", text):
+            return False, f"Please enter your weight in kilograms using numbers (for example: 60 or 72.5). Text descriptions are not accepted.<br><br><b>{same_question}</b>"
+        return True, None
+
+    # Q4: Gender – restrict to known options
+    if question_num == 4:
+        valid_genders = {"male", "female", "other", "m", "f", "o"}
+        if text not in valid_genders:
+            return False, f"Please answer gender as <b>Male</b>, <b>Female</b>, or <b>Other</b> (you can also use M/F/O).<br><br><b>{same_question}</b>"
+        return True, None
+
+    # Q5: Blood group – restrict to known blood types
+    if question_num == 5:
+        # Accept common patterns: A, A+, A-, B, B+, B-, AB, AB+, AB-, O, O+, O-
+        normalized = text.replace(" ", "").upper()
+        valid_blood_groups = {
+            "A", "A+", "A-",
+            "B", "B+", "B-",
+            "AB", "AB+", "AB-",
+            "O", "O+", "O-",
+        }
+        if normalized not in valid_blood_groups:
+            return False, (
+                "Please enter a valid blood group like <b>A+</b>, <b>A-</b>, <b>B+</b>, <b>B-</b>, "
+                "<b>AB+</b>, <b>AB-</b>, <b>O+</b>, or <b>O-</b>.<br><br>"
+                f"<b>{same_question}</b>"
+            )
+        return True, None
+
+    # Yes/No questions only
+    yes_no_questions = {6, 7, 10, 11, 13, 15, 17, 19, 21, 23, 24, 25}
+    if question_num in yes_no_questions:
+        return require_yes_no()
+
+    # All other questions: current generic rules (uncertain answer check) are enough
+    return True, None
+
 def check_eligibility(profile):
     """Check blood donation eligibility based on profile"""
     reasons = []
@@ -509,6 +577,16 @@ def report_api(request):
                     same_question = ELIGIBILITY_QUESTIONS[current_question - 1]
                     return JsonResponse({
                         'answer': f"Please answer this question as accurately as you can. Answers like 'don't know' or 'not sure' are not allowed.<br><br><b>{same_question}</b>",
+                        'in_question_flow': True,
+                        'question_number': current_question,
+                        'total_questions': len(ELIGIBILITY_QUESTIONS)
+                    })
+
+                # Per-question strict validation (Yes/No only, gender options, numeric age/weight, etc.)
+                is_valid, error_msg = validate_answer(current_question, answer, profile)
+                if not is_valid:
+                    return JsonResponse({
+                        'answer': error_msg,
                         'in_question_flow': True,
                         'question_number': current_question,
                         'total_questions': len(ELIGIBILITY_QUESTIONS)
