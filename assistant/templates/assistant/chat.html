@@ -26,7 +26,7 @@
             background: #a8a8a8;
         }
 
-        /* Typing Animation (Three Dots) */
+        /* Typing Animation */
         .typing-dot {
             animation: typing 1.4s infinite ease-in-out both;
             background-color: #9CA3AF;
@@ -46,55 +46,155 @@
         }
 
         @keyframes typing {
-
-            0%,
-            80%,
-            100% {
+            0%, 80%, 100% {
                 transform: scale(0);
             }
-
             40% {
                 transform: scale(1);
             }
         }
+
+        /* Tab Styles */
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 
-<body class="bg-gray-100 h-screen flex flex-col">
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 h-screen flex flex-col">
 
-    <header class="bg-white shadow-sm p-4 z-10">
-        <div class="max-w-4xl mx-auto flex justify-center items-center">
-            <div class="flex items-center gap-2">
-                <span class="material-icons text-red-600 text-3xl">bloodtype</span>
-                <h1 class="text-xl font-bold text-gray-800">Blood Assistant AI</h1>
+    <header class="bg-white shadow-lg p-4 z-10">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-red-100 p-2 rounded-full">
+                        <span class="material-icons text-red-600 text-3xl">bloodtype</span>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Blood Assistant AI</h1>
+                        <p class="text-xs text-gray-500">Your intelligent blood donation companion</p>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
 
-    <main class="flex-1 overflow-y-auto p-4" id="chat-container">
-        <div class="max-w-4xl mx-auto space-y-6" id="chatbox">
+    <!-- Tabs -->
+    <div class="bg-white border-b shadow-sm">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex gap-2">
+                <button id="tab-chat" onclick="switchTab('chat')" 
+                    class="tab-button active px-6 py-3 font-semibold rounded-t-lg flex items-center gap-2">
+                    <span class="material-icons text-lg">chat</span>
+                    Chat with AI
+                </button>
+                <button id="tab-report" onclick="switchTab('report')" 
+                    class="tab-button px-6 py-3 font-semibold rounded-t-lg flex items-center gap-2 text-gray-600 hover:text-red-600">
+                    <span class="material-icons text-lg">description</span>
+                    Generate Report
+                </button>
+            </div>
+        </div>
+    </div>
 
+    <!-- Chat Tab Content -->
+    <div id="content-chat" class="tab-content active flex-1 overflow-y-auto p-4">
+        <div class="max-w-4xl mx-auto space-y-6" id="chatbox">
             <div class="flex gap-4">
-                <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                    <span class="material-icons text-red-600 text-sm">smart_toy</span>
+                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                    <span class="material-icons text-red-600">smart_toy</span>
                 </div>
-                <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm max-w-[80%]">
-                    <p class="text-gray-800">Hello! I am your AI Blood Assistant. I can understand many languages. Ask
-                        me anything about blood, health, or medical tests!</p>
+                <div class="bg-white p-5 rounded-2xl rounded-tl-none shadow-md max-w-[80%] border border-gray-100">
+                    <p class="text-gray-800">Hello! I am your AI Blood Assistant. I can answer questions about blood donation, health, medical tests, and help you find blood banks. Ask me anything!</p>
                     <button onclick="speakText(this.previousElementSibling.textContent)"
-                        class="text-gray-400 hover:text-red-500 mt-1">
+                        class="text-gray-400 hover:text-red-500 mt-2 transition-colors">
                         <span class="material-icons text-lg align-bottom">volume_up</span>
                     </button>
                 </div>
             </div>
-
         </div>
         <div id="scroll-anchor"></div>
-    </main>
+    </div>
 
-    <footer class="bg-white border-t p-4">
+    <!-- Report Tab Content -->
+    <div id="content-report" class="tab-content flex-1 overflow-y-auto p-4">
+        <div class="max-w-4xl mx-auto">
+            <!-- Progress Bar -->
+            <div id="report-progress" class="hidden mb-6">
+                <div class="bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div id="progress-bar" class="progress-bar bg-gradient-to-r from-red-500 to-red-600 h-full rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="progress-text" class="text-sm text-gray-600 mt-2 text-center"></p>
+            </div>
+
+            <!-- Report Chat Area -->
+            <div class="space-y-6" id="reportbox">
+                <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                        <span class="material-icons text-blue-600">assignment</span>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl rounded-tl-none shadow-md max-w-[80%] border border-gray-100">
+                        <p class="text-gray-800 font-semibold mb-2">Blood Donation Eligibility Assessment</p>
+                        <p class="text-gray-600 text-sm">I'll ask you a series of questions to assess your eligibility for blood donation. This will help generate a comprehensive report.</p>
+                        <button onclick="startReport()" 
+                            class="mt-4 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-2 rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md flex items-center gap-2">
+                            <span class="material-icons text-sm">play_arrow</span>
+                            Start Assessment
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="report-scroll-anchor"></div>
+
+            <!-- Download Button (shown after completion) -->
+            <div id="download-section" class="hidden mt-6 text-center">
+                <div class="bg-white p-6 rounded-xl shadow-lg border-2 border-red-200">
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">Assessment Complete!</h3>
+                    <p class="text-gray-600 mb-4">Your eligibility report is ready to download.</p>
+                    <button id="download-btn" onclick="downloadReport()" 
+                        class="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-lg flex items-center gap-2 mx-auto">
+                        <span class="material-icons">download</span>
+                        Download Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Input -->
+    <footer class="bg-white border-t shadow-lg p-4">
         <div class="max-w-4xl mx-auto relative">
-
             <div id="loading-controls"
                 class="hidden absolute -top-12 left-1/2 transform -translate-x-1/2 bg-white border shadow-md rounded-full px-4 py-1 flex items-center gap-2 text-sm">
                 <div class="flex">
@@ -102,15 +202,13 @@
                     <div class="typing-dot"></div>
                     <div class="typing-dot"></div>
                 </div>
-                <span class="text-gray-500 ml-2">Generating...</span>
+                <span class="text-gray-500 ml-2">Processing...</span>
                 <button onclick="stopGeneration()" class="ml-2 text-red-500 hover:text-red-700 font-bold border-l pl-2">
                     <span class="material-icons text-sm align-middle">stop_circle</span> Stop
                 </button>
             </div>
 
-            <div
-                class="flex gap-2 items-end bg-gray-50 border rounded-xl p-2 focus-within:ring-2 focus-within:ring-red-200 transition-all">
-
+            <div class="flex gap-2 items-end bg-gray-50 border-2 border-gray-200 rounded-xl p-2 focus-within:ring-2 focus-within:ring-red-200 focus-within:border-red-300 transition-all">
                 <button id="voice-btn" onclick="toggleVoice()"
                     class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors">
                     <span class="material-icons" id="mic-icon">mic</span>
@@ -118,10 +216,10 @@
 
                 <textarea id="question" rows="1"
                     class="flex-1 bg-transparent border-none focus:ring-0 resize-none py-3 max-h-32"
-                    placeholder="Ask a medical question..."></textarea>
+                    placeholder="Type your message..."></textarea>
 
-                <button id="send-btn" onclick="sendQuestion()"
-                    class="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50">
+                <button id="send-btn" onclick="sendMessage()"
+                    class="p-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all disabled:opacity-50 shadow-md">
                     <span class="material-icons">send</span>
                 </button>
             </div>
@@ -130,53 +228,54 @@
     </footer>
 
     <script>
+        // Global variables
         const chatBox = document.getElementById('chatbox');
+        const reportBox = document.getElementById('reportbox');
         const scrollAnchor = document.getElementById('scroll-anchor');
+        const reportScrollAnchor = document.getElementById('report-scroll-anchor');
         const questionInput = document.getElementById('question');
         const loadingControls = document.getElementById('loading-controls');
         const micIcon = document.getElementById('mic-icon');
+        const reportProgress = document.getElementById('report-progress');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const downloadSection = document.getElementById('download-section');
+        const downloadBtn = document.getElementById('download-btn');
 
         let abortController = null;
         let isRecording = false;
         let recognition = null;
-        let detectedLanguage = 'en-US'; // Default language
+        let detectedLanguage = 'en-US';
+        let currentTab = 'chat';
+        let currentProfileId = null;
+        let reportQuestionFlow = false;
+        let reportCurrentQuestion = 0;
+        let reportTotalQuestions = 26;
 
-        // --- 1. Text-to-Speech (Audio Answer) ---
-        function speakText(text, lang = 'en-US') {
-            if ('speechSynthesis' in window) {
-                // Try to use the detected language for the voice
-                const utterance = new SpeechSynthesisUtterance(text);
-                const voices = window.speechSynthesis.getVoices();
-
-                // Find a voice that matches the detected language
-                const voice = voices.find(v => v.lang.startsWith(lang.substring(0, 2)));
-                if (voice) {
-                    utterance.voice = voice;
-                } else {
-                    // Fallback to default if a specific voice is not found
-                    utterance.lang = lang;
-                }
-
-                window.speechSynthesis.cancel(); // Stop any current speech
-                window.speechSynthesis.speak(utterance);
+        // Tab Switching
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            if (tab === 'chat') {
+                document.getElementById('tab-chat').classList.add('active');
+                document.getElementById('content-chat').classList.add('active');
+                questionInput.placeholder = "Ask a medical question...";
             } else {
-                console.warn("Text-to-Speech not supported in this browser.");
+                document.getElementById('tab-report').classList.add('active');
+                document.getElementById('content-report').classList.add('active');
+                questionInput.placeholder = "Answer the question...";
             }
         }
 
-        // --- 2. Auto-Resize Textarea ---
-        questionInput.addEventListener('input', function () {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        });
-
-        // --- 3. Voice Recognition Setup (Dynamic Language) ---
+        // Voice Recognition Setup
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
-            recognition.lang = 'auto'; // Attempt to detect language automatically
+            recognition.lang = 'auto';
 
             recognition.onstart = () => {
                 isRecording = true;
@@ -184,24 +283,18 @@
                 micIcon.parentElement.classList.add('bg-red-100', 'text-red-600');
                 questionInput.placeholder = "Listening...";
             };
-
             recognition.onend = () => {
                 isRecording = false;
                 micIcon.textContent = 'mic';
                 micIcon.parentElement.classList.remove('bg-red-100', 'text-red-600');
-                questionInput.placeholder = "Ask a medical question...";
+                questionInput.placeholder = currentTab === 'chat' ? "Ask a medical question..." : "Answer the question...";
             };
-
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript;
-                const lang = event.results[0][0].lang || 'en-US'; // Get detected language from speech result
-
-                detectedLanguage = lang; // Store the detected language
+                const lang = event.results[0][0].lang || 'en-US';
+                detectedLanguage = lang;
                 questionInput.value = transcript;
                 questionInput.focus();
-
-                // You can optionally send the question automatically after speech recognition stops
-                // sendQuestion(); 
             };
         } else {
             document.getElementById('voice-btn').style.display = 'none';
@@ -209,48 +302,65 @@
 
         function toggleVoice() {
             if (!recognition) return;
-
             if (isRecording) recognition.stop();
             else recognition.start();
         }
 
-        // --- 4. Chat Logic & Controls ---
+        // Text To Speech
+        function speakText(text, lang = 'en-US') {
+            if ('speechSynthesis' in window) {
+                let tempDiv = document.createElement("div");
+                tempDiv.innerHTML = text;
+                let cleanText = tempDiv.textContent || tempDiv.innerText || "";
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                const voices = window.speechSynthesis.getVoices();
+                const voice = voices.find(v => v.lang.startsWith(lang.substring(0, 2)));
+                if (voice) utterance.voice = voice;
+                else utterance.lang = lang;
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(utterance);
+            }
+        }
 
+        // Stop Generation
         function stopGeneration() {
             if (abortController) {
                 abortController.abort();
                 abortController = null;
                 loadingControls.classList.add('hidden');
-                appendMessage("System", "Generation stopped by user.", "text-red-500 italic");
+                appendMessage(currentTab === 'chat' ? chatBox : reportBox, "System", "Generation stopped by user.", "text-red-500 italic");
             }
         }
 
-        function editPrompt(text) {
-            questionInput.value = text;
-            questionInput.focus();
+        function autoResize() {
             questionInput.style.height = 'auto';
             questionInput.style.height = (questionInput.scrollHeight) + 'px';
         }
 
-        async function sendQuestion() {
+        // Send Message
+        async function sendMessage() {
             const q = questionInput.value.trim();
             if (!q) return;
 
-            // Simple language detection for text input if voice wasn't used
-            // This is basic and not always accurate, but helps the TTS
-            if (q && q.match(/[\u0900-\u097F]/)) { // Detect basic Hindi/Devanagari script
-                detectedLanguage = 'hi-IN';
-            } else if (q && q.match(/[\u00C0-\u017F]/)) { // Detect basic accents for European languages
-                detectedLanguage = 'es-ES';
+            if (q.match(/[\u0900-\u097F]/)) detectedLanguage = 'hi-IN';
+            else if (q.match(/[\u00C0-\u017F]/)) detectedLanguage = 'es-ES';
+            else detectedLanguage = 'en-US';
+
+            document.querySelectorAll('.rec-container').forEach(e => e.style.display = 'none');
+
+            if (currentTab === 'chat') {
+                await sendChatMessage(q);
             } else {
-                detectedLanguage = 'en-US';
+                await sendReportMessage(q);
             }
 
-
-            // UI Updates
-            appendMessage('You', q);
             questionInput.value = '';
-            questionInput.style.height = 'auto';
+            autoResize();
+        }
+
+        // Chat Message
+        async function sendChatMessage(q) {
+            appendMessage(chatBox, 'You', q);
             loadingControls.classList.remove('hidden');
             scrollAnchor.scrollIntoView({ behavior: 'smooth' });
 
@@ -259,26 +369,18 @@
             try {
                 const response = await fetch('/api/chat/', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // Note: If you face 403 error, uncomment the CSRF token
-                        // 'X-CSRFToken': getCookie('csrftoken') 
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ question: q }),
                     signal: abortController.signal
                 });
 
-                if (!response.ok) throw new Error('Network response was not ok');
-
+                if (!response.ok) throw new Error('Network error');
                 const data = await response.json();
-                // Pass the detected language to the append function
-                appendMessage('Assistant', data.answer, 'text-gray-800', data.confidence, detectedLanguage);
+                appendMessage(chatBox, 'Assistant', data.answer, 'text-gray-800', data.confidence, detectedLanguage, data.recommendations);
 
             } catch (error) {
-                if (error.name === 'AbortError') {
-                    console.log('Fetch aborted');
-                } else {
-                    appendMessage('Error', 'Something went wrong. Please check your server and internet connection.', 'text-red-600');
+                if (error.name !== 'AbortError') {
+                    appendMessage(chatBox, 'Error', 'Something went wrong.', 'text-red-600');
                 }
             } finally {
                 loadingControls.classList.add('hidden');
@@ -287,51 +389,148 @@
             }
         }
 
-        function appendMessage(sender, text, colorClass = 'text-gray-800', confidence = null, lang = 'en-US') {
-            const isUser = sender === 'You';
+        // Report Message
+        async function sendReportMessage(q) {
+            appendMessage(reportBox, 'You', q);
+            loadingControls.classList.remove('hidden');
+            reportScrollAnchor.scrollIntoView({ behavior: 'smooth' });
 
+            abortController = new AbortController();
+
+            try {
+                const response = await fetch('/api/report/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer: q }),
+                    signal: abortController.signal
+                });
+
+                if (!response.ok) throw new Error('Network error');
+                const data = await response.json();
+
+                if (data.in_question_flow) {
+                    reportQuestionFlow = true;
+                    reportCurrentQuestion = data.question_number;
+                    reportTotalQuestions = data.total_questions;
+                    updateProgress(data.question_number, data.total_questions);
+                    appendMessage(reportBox, 'Assistant', data.answer, 'text-gray-800', null, detectedLanguage, [], true, data.question_number, data.total_questions);
+                } else if (data.completed) {
+                    reportQuestionFlow = false;
+                    reportCurrentQuestion = 0;
+                    currentProfileId = data.profile_id;
+                    updateProgress(100, 100);
+                    appendMessage(reportBox, 'Assistant', data.answer, 'text-gray-800', null, detectedLanguage);
+                    
+                    // Show eligibility result
+                    const statusClass = data.eligible ? 'text-green-600 bg-green-50 border-green-200' : 'text-red-600 bg-red-50 border-red-200';
+                    const statusText = data.eligible ? '✓ Eligible' : '✗ Not Eligible';
+                    let reasonsHtml = '<ul class="list-disc list-inside mt-2 space-y-1">';
+                    data.reasons.forEach(reason => {
+                        reasonsHtml += `<li class="text-sm">${reason}</li>`;
+                    });
+                    reasonsHtml += '</ul>';
+                    
+                    appendMessage(reportBox, 'System', 
+                        `<div class="p-4 rounded-lg border-2 ${statusClass}">
+                            <h3 class="font-bold text-lg mb-2">${statusText}</h3>
+                            ${reasonsHtml}
+                        </div>`, 
+                        'text-gray-800');
+                    
+                    downloadSection.classList.remove('hidden');
+                    reportScrollAnchor.scrollIntoView({ behavior: 'smooth' });
+                }
+
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    appendMessage(reportBox, 'Error', 'Something went wrong.', 'text-red-600');
+                }
+            } finally {
+                loadingControls.classList.add('hidden');
+                abortController = null;
+                reportScrollAnchor.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Start Report
+        function startReport() {
+            reportQuestionFlow = true;
+            reportCurrentQuestion = 0;
+            sendReportMessage('start');
+        }
+
+        // Download Report
+        function downloadReport() {
+            if (currentProfileId) {
+                window.open(`/download-report/${currentProfileId}/`, '_blank');
+            }
+        }
+
+        // Update Progress
+        function updateProgress(current, total) {
+            const percentage = (current / total) * 100;
+            progressBar.style.width = percentage + '%';
+            progressText.textContent = `Question ${current} of ${total} (${Math.round(percentage)}%)`;
+            reportProgress.classList.remove('hidden');
+        }
+
+        // Append Message
+        function appendMessage(container, sender, text, colorClass = 'text-gray-800', confidence = null, lang = 'en-US', recommendations = [], inFlow = false, qNum = 0, totalQ = 10) {
+            const isUser = sender === 'You';
             let html = '';
+
             if (isUser) {
-                // User Message (Right Side)
                 html = `
                 <div class="flex gap-4 justify-end group">
-                    <div class="bg-blue-600 text-white p-4 rounded-2xl rounded-tr-none shadow-sm max-w-[80%] relative">
+                    <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-2xl rounded-tr-none shadow-md max-w-[80%] relative">
                         <p>${text}</p>
-                        <button onclick="editPrompt('${text.replace(/'/g, "\\'")}')" class="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600" title="Edit">
-                            <span class="material-icons text-sm">edit</span>
-                        </button>
                     </div>
-                    <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0 text-xs font-bold text-blue-600">
-                        ME
-                    </div>
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0 text-xs font-bold text-blue-600">ME</div>
                 </div>`;
             } else {
-                // AI Message (Left Side)
-                // Added a speaker icon button to trigger Text-to-Speech
+                const questionIndicator = inFlow && qNum > 0 ? `
+                    <div class="mb-2 text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block">
+                        Question ${qNum} of ${totalQ}
+                    </div>
+                ` : '';
+                
                 html = `
                 <div class="flex gap-4">
-                    <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                        <span class="material-icons text-red-600 text-sm">smart_toy</span>
+                    <div class="w-10 h-10 rounded-full ${container === chatBox ? 'bg-red-100' : 'bg-blue-100'} flex items-center justify-center shrink-0">
+                        <span class="material-icons ${container === chatBox ? 'text-red-600' : 'text-blue-600'}">${container === chatBox ? 'smart_toy' : 'assignment'}</span>
                     </div>
-                    <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm max-w-[80%] border border-gray-100">
-                        <p class="${colorClass}">${text}</p>
-                        <div class="flex justify-between items-center mt-2">
-                             <button onclick="speakText('${text.replace(/'/g, "\\'")}', '${lang}')" class="text-gray-400 hover:text-red-500">
-                                <span class="material-icons text-lg align-bottom">volume_up</span> Listen
-                            </button>
-                            ${confidence ? `<div class="text-xs text-gray-400">Confidence: ${(confidence * 100).toFixed(0)}%</div>` : ''}
+                    <div class="max-w-[85%]">
+                        <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-md border border-gray-100">
+                            ${questionIndicator}
+                            <div class="${colorClass} message-text">${text}</div>
+                            <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-50">
+                                <button onclick="speakText(this.closest('.bg-white').querySelector('.message-text').textContent, '${lang}')" class="text-gray-400 hover:text-red-500 flex items-center gap-1 text-xs transition-colors">
+                                    <span class="material-icons text-sm">volume_up</span> Listen
+                                </button>
+                                ${confidence ? `<div class="text-xs text-gray-300">${(confidence * 100).toFixed(0)}%</div>` : ''}
+                            </div>
                         </div>
+                        ${recommendations && recommendations.length > 0 ? `
+                        <div class="flex flex-wrap gap-2 mt-3 ml-1 rec-container">
+                            ${recommendations.map(rec => `
+                                <button onclick="questionInput.value='${rec.replace(/'/g, "\\'")}'; sendMessage();" 
+                                    class="bg-white border border-blue-200 text-blue-600 text-xs px-3 py-2 rounded-full hover:bg-blue-50 hover:border-blue-300 transition-colors shadow-sm">
+                                    ${rec}
+                                </button>
+                            `).join('')}
+                        </div>` : ''}
                     </div>
                 </div>`;
             }
-            chatBox.insertAdjacentHTML('beforeend', html);
+            container.insertAdjacentHTML('beforeend', html);
         }
 
-        // Allow "Enter" to send
+        // Event Listeners
+        questionInput.addEventListener('input', autoResize);
         questionInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendQuestion();
+                sendMessage();
             }
         });
     </script>
