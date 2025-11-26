@@ -241,6 +241,36 @@ def save_answer_to_profile(profile, question_num, answer):
     
     profile.save()
 
+
+def is_uncertain_answer(answer: str) -> bool:
+    """
+    Returns True if the user answer clearly indicates uncertainty / refusal,
+    e.g. 'don't know', 'idk', 'na', 'not sure', etc.
+    """
+    if not answer:
+        return True
+    text = answer.strip().lower()
+    uncertain_phrases = [
+        "dont know", "don't know", "do not know", "idk", "dk",
+        "no idea", "not sure", "unsure", "n/a", "na", "none", "nothing"
+    ]
+    # single very short tokens like "?" or "-" are also treated as invalid
+    if len(text) <= 1:
+        return True
+    return any(p in text for p in uncertain_phrases)
+
+
+def is_valid_blood_pressure(answer: str) -> bool:
+    """
+    Basic validation for blood pressure: require at least one digit.
+    Accept formats like '120/80', '110 70', '120-80', or even single numbers.
+    Pure text without digits (e.g. 'normal', 'high') is rejected.
+    """
+    if not answer:
+        return False
+    text = answer.strip()
+    return any(ch.isdigit() for ch in text)
+
 def check_eligibility(profile):
     """Check blood donation eligibility based on profile"""
     reasons = []
@@ -473,12 +503,76 @@ def report_api(request):
             # If in question flow, handle the answer
             if question_flow_active and current_question > 0:
                 profile = get_or_create_profile(request)
+
+                # --- Validation: reject uncertain / bad answers and re-ask same question ---
+                if is_uncertain_answer(answer):
+                    same_question = ELIGIBILITY_QUESTIONS[current_question - 1]
+                    return JsonResponse({
+                        'answer': f"Please answer this question as accurately as you can. Answers like 'don't know' or 'not sure' are not allowed.<br><br><b>{same_question}</b>",
+                        'in_question_flow': True,
+                        'question_number': current_question,
+                        'total_questions': len(ELIGIBILITY_QUESTIONS)
+                    })
+
+                # Special validation for blood pressure question (Q9) – must contain numbers
+                if current_question == 9 and not is_valid_blood_pressure(answer):
+                    same_question = ELIGIBILITY_QUESTIONS[current_question - 1]
+                    return JsonResponse({
+                        'answer': f"Please enter your blood pressure using numbers (for example: 120/80). Text like 'normal' or 'high' is not accepted.<br><br><b>{same_question}</b>",
+                        'in_question_flow': True,
+                        'question_number': current_question,
+                        'total_questions': len(ELIGIBILITY_QUESTIONS)
+                    })
+
                 save_answer_to_profile(profile, current_question, answer)
-                
+
                 # Move to next question
                 current_question += 1
+
+                # --- Conditional skipping logic ---
+                # We loop in case multiple consecutive questions need to be skipped.
+                while current_question <= len(ELIGIBILITY_QUESTIONS):
+                    # Skip pregnancy/breastfeeding questions for males
+                    if current_question in (23, 24):
+                        if profile.gender and 'male' in profile.gender.lower():
+                            current_question += 1
+                            continue
+
+                    # Skip "If yes, specify..." questions when previous answer was effectively "No"
+                    # Q11 -> Q12 (allergies)
+                    if current_question == 12 and profile.has_allergies is False:
+                        current_question += 1
+                        continue
+                    # Q13 -> Q14 (medications)
+                    if current_question == 14 and profile.taking_medications is False:
+                        current_question += 1
+                        continue
+                    # Q15 -> Q16 (donated before)
+                    if current_question == 16 and profile.donated_before is False:
+                        current_question += 1
+                        continue
+                    # Q17 -> Q18 (chronic diseases)
+                    if current_question == 18 and profile.has_chronic_diseases is False:
+                        current_question += 1
+                        continue
+                    # Q19 -> Q20 (infectious diseases)
+                    if current_question == 20 and profile.has_infectious_disease is False:
+                        current_question += 1
+                        continue
+                    # Q21 -> Q22 (tattoo/piercing)
+                    if current_question == 22 and profile.has_tattoo_piercing is False:
+                        current_question += 1
+                        continue
+                    # Q25 -> Q26 (surgery)
+                    if current_question == 26 and profile.has_surgery_recently is False:
+                        current_question += 1
+                        continue
+
+                    # If no skipping rule applied, break out of loop
+                    break
+
                 request.session['report_current_question'] = current_question
-                
+
                 if current_question <= len(ELIGIBILITY_QUESTIONS):
                     # Ask next question
                     next_question = ELIGIBILITY_QUESTIONS[current_question - 1]
@@ -492,10 +586,10 @@ def report_api(request):
                     # All questions completed - generate report
                     request.session['report_question_flow'] = False
                     request.session['report_current_question'] = 0
-                    
+
                     # Check eligibility
                     eligible, reasons = check_eligibility(profile)
-                    
+
                     return JsonResponse({
                         'answer': f'Thank you for providing all the information! Your eligibility assessment is complete.',
                         'in_question_flow': False,
