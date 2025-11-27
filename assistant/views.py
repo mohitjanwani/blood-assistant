@@ -18,21 +18,62 @@ from .models import UserHealthProfile
 TAVILY_API_KEY = "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" 
 TAVILY_CLIENT = TavilyClient(api_key=TAVILY_API_KEY)
 IRCS_GUJ_CAMPS_URL = "https://www.indianredcross.org/gujarat"
-GENERATOR = None
+
+# Available AI Models Configuration
+AVAILABLE_MODELS = {
+    "google/flan-t5-large": {
+        "name": "Flan-T5 Large",
+        "description": "Balanced - Best for most tasks",
+        "badge": "Default"
+    },
+    "google/flan-t5-base": {
+        "name": "Flan-T5 Base",
+        "description": "Fast - Quick responses",
+        "badge": "Fast"
+    },
+    "google/flan-t5-xl": {
+        "name": "Flan-T5 XL",
+        "description": "Powerful - Most accurate",
+        "badge": "Advanced"
+    }
+}
+
+# Cache for loaded models
+MODEL_CACHE = {}
+DEFAULT_MODEL = "google/flan-t5-large"
 
 # --- 2. HELPER FUNCTIONS ---
 
-def load_model_if_needed():
-    global GENERATOR
-    if GENERATOR is None:
-        print("Loading Generative Model...")
-        try:
-            GENERATOR = pipeline("text2text-generation", model="google/flan-t5-large", max_length=512)
-        except Exception as e:
-            print(f"Error loading model: {e}")
-            raise e
+def load_model_if_needed(model_name=None):
+    """Load AI model with caching support"""
+    global MODEL_CACHE
+    
+    if model_name is None:
+        model_name = DEFAULT_MODEL
+    
+    # Validate model name
+    if model_name not in AVAILABLE_MODELS:
+        model_name = DEFAULT_MODEL
+    
+    # Check if model is already loaded
+    if model_name in MODEL_CACHE:
+        print(f"Using cached model: {model_name}")
+        return MODEL_CACHE[model_name]
+    
+    print(f"Loading Generative Model: {model_name}...")
+    try:
+        generator = pipeline("text2text-generation", model=model_name, max_length=512)
+        MODEL_CACHE[model_name] = generator
+        return generator
+    except Exception as e:
+        print(f"Error loading model {model_name}: {e}")
+        # Fallback to default if available
+        if model_name != DEFAULT_MODEL and DEFAULT_MODEL in MODEL_CACHE:
+            print(f"Falling back to default model: {DEFAULT_MODEL}")
+            return MODEL_CACHE[DEFAULT_MODEL]
+        raise e
 
-def generate_ai_recommendations(topic_text):
+def generate_ai_recommendations(topic_text, generator):
     """Generates 3 SPECIFIC follow-up questions based on the answer text."""
     try:
         short_context = topic_text[:400]
@@ -48,7 +89,7 @@ def generate_ai_recommendations(topic_text):
         Output Format: Q1? Q2? Q3?
         """
         
-        results = GENERATOR(prompt, max_length=100, do_sample=True, temperature=0.95)
+        results = generator(prompt, max_length=100, do_sample=True, temperature=0.95)
         raw_text = results[0]['generated_text'].strip()
         
         parts = raw_text.split('?')
@@ -111,6 +152,14 @@ def get_blood_data_dynamic(city):
 def home(request): return render(request, 'assistant/home.html')
 def chat_page(request): return render(request, 'assistant/chat.html')
 def get_response(request): return JsonResponse({"msg": "Use POST /api/chat"})
+
+@csrf_exempt
+def get_models(request):
+    """Get available AI models"""
+    return JsonResponse({
+        'models': AVAILABLE_MODELS,
+        'default': DEFAULT_MODEL
+    })
 
 def register_view(request):
     if request.method == 'POST':
@@ -439,9 +488,12 @@ def chat_api(request):
         try:
             body = json.loads(request.body)
             question = body.get('question', '').strip()
+            model_name = body.get('model', DEFAULT_MODEL)
+            
             if not question: return JsonResponse({'error': 'Empty'}, status=400)
 
-            load_model_if_needed()
+            # Load the selected model
+            generator = load_model_if_needed(model_name)
             
             q_lower = question.lower()
             intent = "UNKNOWN"
@@ -479,10 +531,10 @@ def chat_api(request):
                 Question: "{question}"
                 Answer (SEARCH or EXPLAIN):
                 """
-                router_out = GENERATOR(router_prompt, max_length=5, do_sample=False)
+                router_out = generator(router_prompt, max_length=5, do_sample=False)
                 intent = router_out[0]['generated_text'].strip().upper()
             
-            print(f"User: {question} | Intent: {intent}")
+            print(f"User: {question} | Intent: {intent} | Model: {model_name}")
 
             # PATH A: SEARCH
             if "SEARCH" in intent:
@@ -492,7 +544,7 @@ def chat_api(request):
                 
                 banks, camps = get_blood_data_dynamic(city)
                 rec_context = f"Blood banks in {city}: " + (banks[0]['name'] if banks else "General info")
-                recommendations = generate_ai_recommendations(rec_context)
+                recommendations = generate_ai_recommendations(rec_context, generator)
 
                 html = f"""<div class="space-y-4"><div class="text-sm text-gray-600 mb-2">Latest locations in <b>{city.title()}</b>.</div>"""
                 
@@ -511,7 +563,8 @@ def chat_api(request):
                     'answer': html,
                     'source': 'Tavily Search',
                     'confidence': 1.0,
-                    'recommendations': recommendations
+                    'recommendations': recommendations,
+                    'model_used': AVAILABLE_MODELS[model_name]['name']
                 })
 
             # PATH B: EXPLAIN
@@ -530,7 +583,7 @@ def chat_api(request):
             Answer:
             """
 
-                res = GENERATOR(
+                res = generator(
                     explain_prompt,
                     max_length=256,
                     do_sample=True,
@@ -539,13 +592,14 @@ def chat_api(request):
                 )
 
                 answer_text = res[0]['generated_text'].strip()
-                recommendations = generate_ai_recommendations(answer_text)
+                recommendations = generate_ai_recommendations(answer_text, generator)
 
                 return JsonResponse({
                     'answer': answer_text,
                     'source': 'Generative AI',
                     'confidence': 1.0,
-                    'recommendations': recommendations
+                    'recommendations': recommendations,
+                    'model_used': AVAILABLE_MODELS[model_name]['name']
                 })
 
         except Exception as e:

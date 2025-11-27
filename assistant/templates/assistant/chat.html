@@ -57,12 +57,17 @@
         /* Tab Styles */
         .tab-button {
             transition: all 0.3s ease;
+            position: relative;
         }
 
         .tab-button.active {
             background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
             color: white;
             box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
+        }
+
+        .tab-button:not(.active):hover {
+            background: rgba(220, 38, 38, 0.1);
         }
 
         .tab-content {
@@ -89,6 +94,113 @@
         .progress-bar {
             transition: width 0.3s ease;
         }
+
+        /* Model Selector Styles */
+        .model-item {
+            cursor: pointer;
+        }
+
+        .model-item:hover {
+            transform: translateY(-1px);
+        }
+
+        /* Message Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .flex.gap-4 {
+            animation: slideIn 0.3s ease;
+        }
+
+        /* Enhanced Button Styles */
+        button {
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Dropdown Animation */
+        #model-dropdown {
+            animation: dropdownFade 0.2s ease;
+        }
+
+        @keyframes dropdownFade {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Enhanced Chat Bubbles */
+        .bg-white {
+            transition: all 0.2s ease;
+        }
+
+        .bg-white:hover {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Gradient Background */
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+        }
+
+        /* Enhanced Header */
+        header {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        /* Enhanced Input */
+        #question {
+            transition: all 0.2s ease;
+        }
+
+        #question:focus {
+            outline: none;
+        }
+
+        /* Recommendation Chips */
+        .rec-container button {
+            animation: chipFade 0.3s ease forwards;
+            opacity: 0;
+        }
+
+        .rec-container button:nth-child(1) {
+            animation-delay: 0.1s;
+        }
+
+        .rec-container button:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .rec-container button:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+        @keyframes chipFade {
+            to {
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 
@@ -104,6 +216,26 @@
                     <div>
                         <h1 class="text-2xl font-bold text-gray-800">Blood Assistant AI</h1>
                         <p class="text-xs text-gray-500">Your intelligent blood donation companion</p>
+                    </div>
+                </div>
+                
+                <!-- Model Selector -->
+                <div class="relative">
+                    <button id="model-selector-btn" onclick="toggleModelSelector()" 
+                        class="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-all shadow-md">
+                        <span id="current-model-text" class="font-medium text-sm">Balanced</span>
+                        <span class="material-icons text-lg">arrow_drop_down</span>
+                    </button>
+                    
+                    <!-- Dropdown Menu -->
+                    <div id="model-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50">
+                        <div class="p-3 border-b border-gray-100">
+                            <h3 class="font-bold text-gray-800 text-sm">Choose your model</h3>
+                            <p class="text-xs text-gray-500 mt-1">Select the AI model that best fits your needs</p>
+                        </div>
+                        <div id="model-list" class="p-2 max-h-96 overflow-y-auto">
+                            <!-- Models will be loaded here dynamically -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -132,15 +264,39 @@
     <div id="content-chat" class="tab-content active flex-1 overflow-y-auto p-4">
         <div class="max-w-4xl mx-auto space-y-6" id="chatbox">
             <div class="flex gap-4">
-                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                    <span class="material-icons text-red-600">smart_toy</span>
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shrink-0 shadow-lg">
+                    <span class="material-icons text-white text-2xl">smart_toy</span>
                 </div>
-                <div class="bg-white p-5 rounded-2xl rounded-tl-none shadow-md max-w-[80%] border border-gray-100">
-                    <p class="text-gray-800">Hello! I am your AI Blood Assistant. I can answer questions about blood donation, health, medical tests, and help you find blood banks. Ask me anything!</p>
-                    <button onclick="speakText(this.previousElementSibling.textContent)"
-                        class="text-gray-400 hover:text-red-500 mt-2 transition-colors">
-                        <span class="material-icons text-lg align-bottom">volume_up</span>
-                    </button>
+                <div class="bg-white p-6 rounded-2xl rounded-tl-none shadow-xl max-w-[80%] border-2 border-gray-100 hover:shadow-2xl transition-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+                        <span class="material-icons text-red-600">waving_hand</span>
+                        Welcome to Blood Assistant AI!
+                    </h3>
+                    <p class="text-gray-700 leading-relaxed">I'm your intelligent companion for all things related to blood donation. I can answer questions about blood donation, health, medical tests, and help you find blood banks near you.</p>
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <p class="text-sm font-semibold text-gray-600 mb-2">Try asking me:</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="questionInput.value='Who can donate blood?'; sendMessage();" 
+                                class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-1.5 rounded-full hover:bg-red-100 transition-colors">
+                                Who can donate blood?
+                            </button>
+                            <button onclick="questionInput.value='What are the benefits of blood donation?'; sendMessage();" 
+                                class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-1.5 rounded-full hover:bg-red-100 transition-colors">
+                                Benefits of donation
+                            </button>
+                            <button onclick="questionInput.value='Find blood banks near me'; sendMessage();" 
+                                class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-1.5 rounded-full hover:bg-red-100 transition-colors">
+                                Find blood banks
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-2">
+                        <button onclick="speakText(this.closest('.bg-white').querySelector('p').textContent)"
+                            class="text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1 text-xs">
+                            <span class="material-icons text-sm">volume_up</span>
+                            <span>Listen</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -152,24 +308,33 @@
         <div class="max-w-4xl mx-auto">
             <!-- Progress Bar -->
             <div id="report-progress" class="hidden mb-6">
-                <div class="bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div id="progress-bar" class="progress-bar bg-gradient-to-r from-red-500 to-red-600 h-full rounded-full" style="width: 0%"></div>
+                <div class="bg-gradient-to-r from-gray-100 to-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
+                    <div id="progress-bar" class="progress-bar bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 h-full rounded-full shadow-lg transition-all duration-500" style="width: 0%"></div>
                 </div>
-                <p id="progress-text" class="text-sm text-gray-600 mt-2 text-center"></p>
+                <p id="progress-text" class="text-sm text-gray-700 font-medium mt-3 text-center"></p>
             </div>
 
             <!-- Report Chat Area -->
             <div class="space-y-6" id="reportbox">
                 <div class="flex gap-4">
-                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                        <span class="material-icons text-blue-600">assignment</span>
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shrink-0 shadow-lg">
+                        <span class="material-icons text-white text-2xl">assignment</span>
                     </div>
-                    <div class="bg-white p-5 rounded-2xl rounded-tl-none shadow-md max-w-[80%] border border-gray-100">
-                        <p class="text-gray-800 font-semibold mb-2">Blood Donation Eligibility Assessment</p>
-                        <p class="text-gray-600 text-sm">I'll ask you a series of questions to assess your eligibility for blood donation. This will help generate a comprehensive report.</p>
+                    <div class="bg-white p-6 rounded-2xl rounded-tl-none shadow-xl max-w-[80%] border-2 border-gray-100 hover:shadow-2xl transition-shadow">
+                        <h3 class="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+                            <span class="material-icons text-blue-600">medical_information</span>
+                            Blood Donation Eligibility Assessment
+                        </h3>
+                        <p class="text-gray-700 text-sm leading-relaxed mb-4">I'll ask you a series of comprehensive questions to assess your eligibility for blood donation. This will help generate a detailed medical report.</p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                            <p class="text-xs text-blue-800 font-medium flex items-start gap-2">
+                                <span class="material-icons text-sm mt-0.5">info</span>
+                                <span>Please answer all questions accurately. The assessment takes approximately 3-5 minutes.</span>
+                            </p>
+                        </div>
                         <button onclick="startReport()" 
-                            class="mt-4 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-2 rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md flex items-center gap-2">
-                            <span class="material-icons text-sm">play_arrow</span>
+                            class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 hover:shadow-xl transition-all shadow-lg flex items-center gap-2 font-semibold">
+                            <span class="material-icons">play_arrow</span>
                             Start Assessment
                         </button>
                     </div>
@@ -178,18 +343,23 @@
             <div id="report-scroll-anchor"></div>
 
             <!-- Download Button (shown after completion) -->
-            <div id="download-section" class="hidden mt-6 text-center">
-                <div class="bg-white p-6 rounded-xl shadow-lg border-2 border-red-200">
-                    <h3 class="text-xl font-bold text-gray-800 mb-2">Assessment Complete!</h3>
-                    <p class="text-gray-600 mb-4">Your eligibility report is ready to download.</p>
-                    <div class="flex flex-col gap-3">
+            <div id="download-section" class="hidden mt-6">
+                <div class="bg-gradient-to-br from-white to-gray-50 p-8 rounded-2xl shadow-2xl border-2 border-gray-200">
+                    <div class="text-center mb-6">
+                        <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                            <span class="material-icons text-white text-3xl">check_circle</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Assessment Complete!</h3>
+                        <p class="text-gray-600">Your comprehensive eligibility report is ready.</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
                         <button id="download-btn" onclick="downloadReport()" 
-                            class="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-3 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-lg flex items-center gap-2 mx-auto">
+                            class="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-3.5 rounded-xl hover:from-green-700 hover:to-green-800 hover:shadow-xl transition-all shadow-lg flex items-center justify-center gap-2 font-semibold">
                             <span class="material-icons">download</span>
                             Download Report
                         </button>
                         <button id="reset-btn" onclick="resetAssessment()" 
-                            class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg flex items-center gap-2 mx-auto">
+                            class="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-8 py-3.5 rounded-xl hover:from-gray-700 hover:to-gray-800 hover:shadow-xl transition-all shadow-lg flex items-center justify-center gap-2 font-semibold">
                             <span class="material-icons">refresh</span>
                             Start New Assessment
                         </button>
@@ -200,35 +370,46 @@
     </div>
 
     <!-- Footer Input -->
-    <footer class="bg-white border-t shadow-lg p-4">
+    <footer class="bg-white border-t shadow-2xl p-4 backdrop-blur-sm bg-opacity-95">
         <div class="max-w-4xl mx-auto relative">
+            <!-- Loading Indicator -->
             <div id="loading-controls"
-                class="hidden absolute -top-12 left-1/2 transform -translate-x-1/2 bg-white border shadow-md rounded-full px-4 py-1 flex items-center gap-2 text-sm">
+                class="hidden absolute -top-14 left-1/2 transform -translate-x-1/2 bg-white border-2 border-gray-200 shadow-xl rounded-2xl px-5 py-2 flex items-center gap-3 text-sm">
                 <div class="flex">
                     <div class="typing-dot"></div>
                     <div class="typing-dot"></div>
                     <div class="typing-dot"></div>
                 </div>
-                <span class="text-gray-500 ml-2">Processing...</span>
-                <button onclick="stopGeneration()" class="ml-2 text-red-500 hover:text-red-700 font-bold border-l pl-2">
-                    <span class="material-icons text-sm align-middle">stop_circle</span> Stop
+                <span class="text-gray-600 font-medium">AI is thinking...</span>
+                <button onclick="stopGeneration()" class="ml-2 text-red-500 hover:text-red-700 font-semibold border-l-2 border-gray-300 pl-3 flex items-center gap-1">
+                    <span class="material-icons text-lg">stop_circle</span>
+                    <span>Stop</span>
                 </button>
             </div>
 
-            <div class="flex gap-2 items-end bg-gray-50 border-2 border-gray-200 rounded-xl p-2 focus-within:ring-2 focus-within:ring-red-200 focus-within:border-red-300 transition-all">
+            <!-- Input Container -->
+            <div class="flex gap-3 items-end bg-white border-2 border-gray-300 rounded-2xl p-3 shadow-lg focus-within:ring-2 focus-within:ring-red-400 focus-within:border-red-400 transition-all hover:border-gray-400">
                 <button id="voice-btn" onclick="toggleVoice()"
-                    class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors">
+                    class="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
                     <span class="material-icons" id="mic-icon">mic</span>
                 </button>
 
                 <textarea id="question" rows="1"
-                    class="flex-1 bg-transparent border-none focus:ring-0 resize-none py-3 max-h-32"
+                    class="flex-1 bg-transparent border-none focus:ring-0 resize-none py-2 px-2 max-h-32 text-gray-800 placeholder-gray-400"
                     placeholder="Type your message..."></textarea>
 
                 <button id="send-btn" onclick="sendMessage()"
-                    class="p-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all disabled:opacity-50 shadow-md">
+                    class="p-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
                     <span class="material-icons">send</span>
                 </button>
+            </div>
+            
+            <!-- Helper Text -->
+            <div class="flex items-center justify-center gap-2 mt-3">
+                <span class="text-xs text-gray-400">Powered by</span>
+                <span id="footer-model-name" class="text-xs font-semibold text-gray-600">Flan-T5 Large</span>
+                <span class="text-xs text-gray-400">•</span>
+                <span class="text-xs text-gray-400">Press Enter to send</span>
             </div>
         </div>
     </footer>
@@ -258,6 +439,109 @@
         let reportCurrentQuestion = 0;
         let reportTotalQuestions = 26;
         let assessmentComplete = false;
+        
+        // Model selection
+        let availableModels = {};
+        let selectedModel = null;
+        let defaultModel = null;
+
+        // Load Available Models
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models/');
+                const data = await response.json();
+                availableModels = data.models;
+                defaultModel = data.default;
+                selectedModel = defaultModel;
+                
+                // Populate model list
+                const modelList = document.getElementById('model-list');
+                modelList.innerHTML = '';
+                
+                Object.keys(availableModels).forEach(modelKey => {
+                    const model = availableModels[modelKey];
+                    const isDefault = modelKey === defaultModel;
+                    
+                    const modelItem = document.createElement('div');
+                    modelItem.className = `model-item p-3 rounded-lg cursor-pointer transition-all hover:bg-gray-50 border-2 ${isDefault ? 'border-blue-500 bg-blue-50' : 'border-transparent'}`;
+                    modelItem.onclick = () => selectModel(modelKey);
+                    
+                    modelItem.innerHTML = `
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-800 text-sm">${model.name}</span>
+                                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                        model.badge === 'Default' ? 'bg-blue-100 text-blue-700' :
+                                        model.badge === 'Fast' ? 'bg-green-100 text-green-700' :
+                                        'bg-purple-100 text-purple-700'
+                                    }">${model.badge}</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">${model.description}</p>
+                            </div>
+                            <span class="material-icons text-blue-600 ${isDefault ? '' : 'hidden'} ml-2">check_circle</span>
+                        </div>
+                    `;
+                    
+                    modelList.appendChild(modelItem);
+                });
+                
+                // Update button text
+                updateModelButtonText();
+                
+            } catch (error) {
+                console.error('Error loading models:', error);
+            }
+        }
+        
+        // Toggle Model Selector Dropdown
+        function toggleModelSelector() {
+            const dropdown = document.getElementById('model-dropdown');
+            dropdown.classList.toggle('hidden');
+        }
+        
+        // Select Model
+        function selectModel(modelKey) {
+            selectedModel = modelKey;
+            
+            // Update UI
+            document.querySelectorAll('.model-item').forEach(item => {
+                item.classList.remove('border-blue-500', 'bg-blue-50');
+                item.classList.add('border-transparent');
+                const checkIcon = item.querySelector('.material-icons');
+                if (checkIcon) checkIcon.classList.add('hidden');
+            });
+            
+            const selectedItem = event.currentTarget;
+            selectedItem.classList.remove('border-transparent');
+            selectedItem.classList.add('border-blue-500', 'bg-blue-50');
+            const checkIcon = selectedItem.querySelector('.material-icons');
+            if (checkIcon) checkIcon.classList.remove('hidden');
+            
+            updateModelButtonText();
+            toggleModelSelector();
+            
+            console.log('Model selected:', modelKey);
+        }
+        
+        // Update Model Button Text
+        function updateModelButtonText() {
+            if (selectedModel && availableModels[selectedModel]) {
+                const badge = availableModels[selectedModel].badge;
+                const name = availableModels[selectedModel].name;
+                document.getElementById('current-model-text').textContent = badge;
+                document.getElementById('footer-model-name').textContent = name;
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('model-dropdown');
+            const button = document.getElementById('model-selector-btn');
+            if (!dropdown.contains(event.target) && !button.contains(event.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
 
         // Tab Switching
         function switchTab(tab) {
@@ -383,13 +667,16 @@
                 const response = await fetch('/api/chat/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: q }),
+                    body: JSON.stringify({ 
+                        question: q,
+                        model: selectedModel || defaultModel
+                    }),
                     signal: abortController.signal
                 });
 
                 if (!response.ok) throw new Error('Network error');
                 const data = await response.json();
-                appendMessage(chatBox, 'Assistant', data.answer, 'text-gray-800', data.confidence, detectedLanguage, data.recommendations);
+                appendMessage(chatBox, 'Assistant', data.answer, 'text-gray-800', data.confidence, detectedLanguage, data.recommendations, false, 0, 0, data.model_used);
 
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -505,15 +792,24 @@
                 // Show welcome message
                 const welcomeHtml = `
                 <div class="flex gap-4">
-                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                        <span class="material-icons text-blue-600">assignment</span>
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shrink-0 shadow-lg">
+                        <span class="material-icons text-white text-2xl">assignment</span>
                     </div>
-                    <div class="bg-white p-5 rounded-2xl rounded-tl-none shadow-md max-w-[80%] border border-gray-100">
-                        <p class="text-gray-800 font-semibold mb-2">Blood Donation Eligibility Assessment</p>
-                        <p class="text-gray-600 text-sm">I'll ask you a series of questions to assess your eligibility for blood donation. This will help generate a comprehensive report.</p>
+                    <div class="bg-white p-6 rounded-2xl rounded-tl-none shadow-xl max-w-[80%] border-2 border-gray-100 hover:shadow-2xl transition-shadow">
+                        <h3 class="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+                            <span class="material-icons text-blue-600">medical_information</span>
+                            Blood Donation Eligibility Assessment
+                        </h3>
+                        <p class="text-gray-700 text-sm leading-relaxed mb-4">I'll ask you a series of comprehensive questions to assess your eligibility for blood donation. This will help generate a detailed medical report.</p>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                            <p class="text-xs text-blue-800 font-medium flex items-start gap-2">
+                                <span class="material-icons text-sm mt-0.5">info</span>
+                                <span>Please answer all questions accurately. The assessment takes approximately 3-5 minutes.</span>
+                            </p>
+                        </div>
                         <button onclick="startReport()" 
-                            class="mt-4 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-2 rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md flex items-center gap-2">
-                            <span class="material-icons text-sm">play_arrow</span>
+                            class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 hover:shadow-xl transition-all shadow-lg flex items-center gap-2 font-semibold">
+                            <span class="material-icons">play_arrow</span>
                             Start Assessment
                         </button>
                     </div>
@@ -559,7 +855,7 @@
         }
 
         // Append Message
-        function appendMessage(container, sender, text, colorClass = 'text-gray-800', confidence = null, lang = 'en-US', recommendations = [], inFlow = false, qNum = 0, totalQ = 10) {
+        function appendMessage(container, sender, text, colorClass = 'text-gray-800', confidence = null, lang = 'en-US', recommendations = [], inFlow = false, qNum = 0, totalQ = 10, modelUsed = null) {
             const isUser = sender === 'You';
             let html = '';
 
@@ -578,6 +874,13 @@
                     </div>
                 ` : '';
                 
+                const modelBadge = modelUsed && container === chatBox ? `
+                    <span class="text-xs text-gray-400 flex items-center gap-1">
+                        <span class="material-icons text-xs">smart_toy</span>
+                        ${modelUsed}
+                    </span>
+                ` : '';
+                
                 html = `
                 <div class="flex gap-4">
                     <div class="w-10 h-10 rounded-full ${container === chatBox ? 'bg-red-100' : 'bg-blue-100'} flex items-center justify-center shrink-0">
@@ -591,7 +894,10 @@
                                 <button onclick="speakText(this.closest('.bg-white').querySelector('.message-text').textContent, '${lang}')" class="text-gray-400 hover:text-red-500 flex items-center gap-1 text-xs transition-colors">
                                     <span class="material-icons text-sm">volume_up</span> Listen
                                 </button>
-                                ${confidence ? `<div class="text-xs text-gray-300">${(confidence * 100).toFixed(0)}%</div>` : ''}
+                                <div class="flex items-center gap-3">
+                                    ${modelBadge}
+                                    ${confidence ? `<div class="text-xs text-gray-300">${(confidence * 100).toFixed(0)}%</div>` : ''}
+                                </div>
                             </div>
                         </div>
                         ${recommendations && recommendations.length > 0 ? `
@@ -616,6 +922,11 @@
                 e.preventDefault();
                 sendMessage();
             }
+        });
+        
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadModels();
         });
     </script>
 </body>
