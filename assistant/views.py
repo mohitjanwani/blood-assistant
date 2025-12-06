@@ -44,6 +44,140 @@ DEFAULT_MODEL = "google/flan-t5-large"
 
 # --- 2. HELPER FUNCTIONS ---
 
+def detect_language(text):
+    """
+    Detect language of the input text.
+    Returns: 'en' (English), 'hi' (Hindi), 'gu' (Gujarati)
+    """
+    if not text or not text.strip():
+        return 'en'
+    
+    # Check for Gujarati script (U+0A80 to U+0AFF)
+    if re.search(r'[\u0A80-\u0AFF]', text):
+        return 'gu'
+    
+    # Check for Hindi/Devanagari script (U+0900 to U+097F)
+    if re.search(r'[\u0900-\u097F]', text):
+        return 'hi'
+    
+    # Default to English
+    return 'en'
+
+def get_language_instruction(lang):
+    """Get language-specific instruction for AI prompts"""
+    instructions = {
+        'en': "Answer in English.",
+        'hi': "Answer in Hindi (हिंदी में उत्तर दें). Use Devanagari script.",
+        'gu': "Answer in Gujarati (ગુજરાતીમાં જવાબ આપો). Use Gujarati script."
+    }
+    return instructions.get(lang, instructions['en'])
+
+def get_language_response_templates(lang):
+    """Get language-specific response templates"""
+    templates = {
+        'en': {
+            'contextless': "I need a little more detail. What specific topic would you like me to explain more about? (e.g., 'Explain more about age limits')",
+            'recommendations': ["Who can donate blood?", "What are the risks?", "Locations near me"]
+        },
+        'hi': {
+            'contextless': "मुझे थोड़ा और विवरण चाहिए। आप किस विशिष्ट विषय के बारे में अधिक जानना चाहेंगे? (उदाहरण: 'उम्र सीमा के बारे में अधिक बताएं')",
+            'recommendations': ["रक्तदान कौन कर सकता है?", "जोखिम क्या हैं?", "मेरे पास स्थान"]
+        },
+        'gu': {
+            'contextless': "મને થોડી વધુ વિગતો જોઈએ છે. તમે કયા ચોક્કસ વિષય વિશે વધુ સમજાવવા માંગો છો? (ઉદાહરણ: 'ઉંમર મર્યાદા વિશે વધુ સમજાવો')",
+            'recommendations': ["રક્તદાન કોણ કરી શકે છે?", "જોખમો શું છે?", "મારી નજીકના સ્થાનો"]
+        }
+    }
+    return templates.get(lang, templates['en'])
+
+# Knowledge base for common blood donation questions
+BLOOD_DONATION_KB = {
+    'en': {
+        'benefits': "Blood donation has several benefits: 1) It helps save lives, 2) Reduces risk of heart disease, 3) Burns calories (about 650 per donation), 4) Free health checkup, 5) Reduces iron overload, 6) Stimulates production of new blood cells. Regular donors often report feeling good about helping others.",
+        'side effects': "Blood donation is generally safe with minimal side effects. Common temporary effects include: slight dizziness, bruising at needle site, mild fatigue. These usually resolve within 24 hours. Serious complications are extremely rare. You should feel normal within a few hours after donation.",
+        'who can donate': "To donate blood, you must: be 18-65 years old, weigh at least 50 kg, be in good health, have hemoglobin levels of at least 12.5 g/dL (females) or 13.5 g/dL (males), not have any infectious diseases, and wait appropriate intervals between donations (56 days for whole blood).",
+        'age limit': "The age limit for blood donation is 18 to 65 years. Donors must be at least 18 years old and not older than 65 years. Some countries may have slightly different age requirements.",
+        'weight requirement': "The minimum weight requirement for blood donation is 50 kg (110 pounds). This ensures the donor's body can safely handle the blood loss during donation.",
+        'how often': "You can donate whole blood every 56 days (approximately 8 weeks). For platelets, you can donate more frequently - every 7 days, up to 24 times per year. Regular donors help maintain a stable blood supply.",
+        'process': "The blood donation process takes about 10-15 minutes: 1) Registration and health screening, 2) Mini physical exam (blood pressure, temperature, hemoglobin check), 3) Blood collection (about 450ml), 4) Rest and refreshments. The entire visit takes about 45-60 minutes including paperwork and recovery time."
+    },
+    'hi': {
+        'benefits': "रक्तदान के कई लाभ हैं: 1) यह जीवन बचाने में मदद करता है, 2) हृदय रोग का जोखिम कम करता है, 3) कैलोरी जलाता है (प्रति दान लगभग 650), 4) मुफ्त स्वास्थ्य जांच, 5) आयरन अधिकता कम करता है, 6) नई रक्त कोशिकाओं के उत्पादन को उत्तेजित करता है। नियमित दाता अक्सर दूसरों की मदद करने के बारे में अच्छा महसूस करने की रिपोर्ट करते हैं।",
+        'side effects': "रक्तदान आमतौर पर न्यूनतम दुष्प्रभावों के साथ सुरक्षित है। सामान्य अस्थायी प्रभावों में शामिल हैं: हल्का चक्कर आना, सुई स्थल पर चोट लगना, हल्की थकान। ये आमतौर पर 24 घंटे के भीतर ठीक हो जाते हैं। गंभीर जटिलताएं अत्यंत दुर्लभ हैं। दान के कुछ घंटे बाद आपको सामान्य महसूस करना चाहिए।",
+        'who can donate': "रक्तदान करने के लिए, आपको होना चाहिए: 18-65 वर्ष की आयु, कम से कम 50 किग्रा वजन, अच्छे स्वास्थ्य में, हीमोग्लोबिन स्तर कम से कम 12.5 g/dL (महिलाएं) या 13.5 g/dL (पुरुष), कोई संक्रामक रोग नहीं, और दान के बीच उचित अंतराल (पूरे रक्त के लिए 56 दिन)।",
+        'age limit': "रक्तदान के लिए आयु सीमा 18 से 65 वर्ष है। दाताओं की आयु कम से कम 18 वर्ष और 65 वर्ष से अधिक नहीं होनी चाहिए। कुछ देशों में थोड़ी अलग आयु आवश्यकताएं हो सकती हैं।",
+        'weight requirement': "रक्तदान के लिए न्यूनतम वजन आवश्यकता 50 किग्रा (110 पाउंड) है। यह सुनिश्चित करता है कि दाता का शरीर दान के दौरान रक्त हानि को सुरक्षित रूप से संभाल सकता है।",
+        'how often': "आप हर 56 दिनों (लगभग 8 सप्ताह) में पूरा रक्त दान कर सकते हैं। प्लेटलेट्स के लिए, आप अधिक बार दान कर सकते हैं - हर 7 दिन, प्रति वर्ष 24 बार तक। नियमित दाता स्थिर रक्त आपूर्ति बनाए रखने में मदद करते हैं।",
+        'process': "रक्तदान प्रक्रिया में लगभग 10-15 मिनट लगते हैं: 1) पंजीकरण और स्वास्थ्य जांच, 2) मिनी शारीरिक परीक्षा (रक्तचाप, तापमान, हीमोग्लोबिन जांच), 3) रक्त संग्रह (लगभग 450ml), 4) आराम और ताज़गी। पूरी यात्रा में कागजी कार्रवाई और रिकवरी समय सहित लगभग 45-60 मिनट लगते हैं।"
+    },
+    'gu': {
+        'benefits': "રક્તદાનના ઘણા ફાયદા છે: 1) તે જીવન બચાવવામાં મદદ કરે છે, 2) હૃદય રોગનું જોખમ ઘટાડે છે, 3) કેલરી બળાવે છે (પ્રતિ દાન લગભગ 650), 4) મફત આરોગ્ય તપાસ, 5) આયર્ન ઓવરલોડ ઘટાડે છે, 6) નવી રક્ત કોશિકાઓના ઉત્પાદનને ઉત્તેજિત કરે છે. નિયમિત દાતાઓ ઘણીવાર અન્યોને મદદ કરવા વિશે સારું લાગવાની જાણ કરે છે.",
+        'side effects': "રક્તદાન સામાન્ય રીતે ઓછામાં ઓછા આડઅસરો સાથે સુરક્ષિત છે. સામાન્ય અસ્થાયી અસરોમાં શામેલ છે: થોડું ચક્કર આવવું, સોય સ્થળે ચામડી પર લાલ ચિહ્ન, હળવી થાક. આ સામાન્ય રીતે 24 કલાકમાં ઠીક થઈ જાય છે. ગંભીર જટિલતાઓ અત્યંત દુર્લભ છે. દાન પછી થોડા કલાકોમાં તમે સામાન્ય લાગવું જોઈએ.",
+        'who can donate': "રક્તદાન કરવા માટે, તમારે હોવું જોઈએ: 18-65 વર્ષની ઉંમર, ઓછામાં ઓછું 50 કિગ્રા વજન, સારા આરોગ્યમાં, હીમોગ્લોબિન સ્તર ઓછામાં ઓછું 12.5 g/dL (સ્ત્રીઓ) અથવા 13.5 g/dL (પુરુષો), કોઈ સંક્રામક રોગ નહીં, અને દાન વચ્ચે યોગ્ય અંતરાલ (સંપૂર્ણ રક્ત માટે 56 દિવસ).",
+        'age limit': "રક્તદાન માટે ઉંમર મર્યાદા 18 થી 65 વર્ષ છે. દાતાઓની ઉંમર ઓછામાં ઓછી 18 વર્ષ અને 65 વર્ષથી વધુ નહીં હોવી જોઈએ. કેટલાક દેશોમાં થોડી અલગ ઉંમરની આવશ્યકતાઓ હોઈ શકે છે.",
+        'weight requirement': "રક્તદાન માટે ન્યૂનતમ વજન આવશ્યકતા 50 કિગ્રા (110 પાઉન્ડ) છે. આ ખાતરી કરે છે કે દાતાનું શરીર દાન દરમિયાન રક્ત હાનિને સુરક્ષિત રીતે સંભાળી શકે છે.",
+        'how often': "તમે દર 56 દિવસ (આશરે 8 અઠવાડિયા) માં સંપૂર્ણ રક્ત દાન કરી શકો છો. પ્લેટલેટ્સ માટે, તમે વધુ વારંવાર દાન કરી શકો છો - દર 7 દિવસ, વર્ષ દીઠ 24 વખત સુધી. નિયમિત દાતાઓ સ્થિર રક્ત પુરવઠો જાળવવામાં મદદ કરે છે.",
+        'process': "રક્તદાન પ્રક્રિયામાં આશરે 10-15 મિનિટ લાગે છે: 1) નોંધણી અને આરોગ્ય સ્ક્રીનિંગ, 2) મિની શારીરિક પરીક્ષા (રક્તચાપ, તાપમાન, હીમોગ્લોબિન તપાસ), 3) રક્ત સંગ્રહ (આશરે 450ml), 4) આરામ અને તાજગી. સંપૂર્ણ મુલાકાતમાં કાગળકામ અને પુનઃપ્રાપ્તિ સમય સહિત આશરે 45-60 મિનિટ લાગે છે."
+    }
+}
+
+def get_knowledge_base_answer(question, lang='en'):
+    """Check knowledge base for common questions"""
+    question_lower = question.lower().strip()
+    
+    # English keywords
+    if lang == 'en':
+        if any(word in question_lower for word in ['benefit', 'advantage', 'good', 'help']):
+            return BLOOD_DONATION_KB[lang]['benefits']
+        elif any(word in question_lower for word in ['side effect', 'risk', 'danger', 'harm', 'bad']):
+            return BLOOD_DONATION_KB[lang]['side effects']
+        elif any(word in question_lower for word in ['who can', 'eligible', 'qualify', 'requirement']):
+            return BLOOD_DONATION_KB[lang]['who can donate']
+        elif any(word in question_lower for word in ['age', 'old', 'young']):
+            return BLOOD_DONATION_KB[lang]['age limit']
+        elif any(word in question_lower for word in ['weight', 'kg', 'pound']):
+            return BLOOD_DONATION_KB[lang]['weight requirement']
+        elif any(word in question_lower for word in ['how often', 'frequency', 'time between']):
+            return BLOOD_DONATION_KB[lang]['how often']
+        elif any(word in question_lower for word in ['process', 'procedure', 'step', 'how to']):
+            return BLOOD_DONATION_KB[lang]['process']
+    
+    # Hindi keywords
+    elif lang == 'hi':
+        if any(word in question_lower for word in ['लाभ', 'फायदा', 'अच्छा']):
+            return BLOOD_DONATION_KB[lang]['benefits']
+        elif any(word in question_lower for word in ['दुष्प्रभाव', 'जोखिम', 'नुकसान', 'बुरा']):
+            return BLOOD_DONATION_KB[lang]['side effects']
+        elif any(word in question_lower for word in ['कौन कर सकता', 'योग्य', 'आवश्यकता']):
+            return BLOOD_DONATION_KB[lang]['who can donate']
+        elif any(word in question_lower for word in ['उम्र', 'सीमा']):
+            return BLOOD_DONATION_KB[lang]['age limit']
+        elif any(word in question_lower for word in ['वजन', 'किलो']):
+            return BLOOD_DONATION_KB[lang]['weight requirement']
+        elif any(word in question_lower for word in ['कितनी बार', 'कितने दिन', 'अंतराल']):
+            return BLOOD_DONATION_KB[lang]['how often']
+        elif any(word in question_lower for word in ['प्रक्रिया', 'तरीका', 'कैसे']):
+            return BLOOD_DONATION_KB[lang]['process']
+    
+    # Gujarati keywords
+    elif lang == 'gu':
+        if any(word in question_lower for word in ['લાભ', 'ફાયદો', 'સારું']):
+            return BLOOD_DONATION_KB[lang]['benefits']
+        elif any(word in question_lower for word in ['આડઅસર', 'જોખમ', 'નુકસાન', 'ખરાબ']):
+            return BLOOD_DONATION_KB[lang]['side effects']
+        elif any(word in question_lower for word in ['કોણ કરી શકે', 'યોગ્ય', 'જરૂરિયાત']):
+            return BLOOD_DONATION_KB[lang]['who can donate']
+        elif any(word in question_lower for word in ['ઉંમર', 'મર્યાદા']):
+            return BLOOD_DONATION_KB[lang]['age limit']
+        elif any(word in question_lower for word in ['વજન', 'કિલો']):
+            return BLOOD_DONATION_KB[lang]['weight requirement']
+        elif any(word in question_lower for word in ['કેટલી વાર', 'કેટલા દિવસ', 'અંતરાલ']):
+            return BLOOD_DONATION_KB[lang]['how often']
+        elif any(word in question_lower for word in ['પ્રક્રિયા', 'રીત', 'કેવી રીતે']):
+            return BLOOD_DONATION_KB[lang]['process']
+    
+    return None
+
 def load_model_if_needed(model_name=None):
     """Load AI model with caching support"""
     global MODEL_CACHE
@@ -73,11 +207,14 @@ def load_model_if_needed(model_name=None):
             return MODEL_CACHE[DEFAULT_MODEL]
         raise e
 
-def generate_ai_recommendations(topic_text, generator):
+def generate_ai_recommendations(topic_text, generator, lang='en'):
     """Generates 3 SPECIFIC follow-up questions based on the answer text."""
     try:
         short_context = topic_text[:400]
-        prompt = f"""
+        
+        # Language-specific prompts
+        prompts = {
+            'en': f"""
         Read this medical text: "{short_context}"
         
         Task: Create 3 specific follow-up questions a user might ask. 
@@ -85,10 +222,37 @@ def generate_ai_recommendations(topic_text, generator):
         1. Questions must be about the text.
         2. Do NOT use generic phrases like "Tell me more" or "Explain".
         3. Make them complete questions.
+        4. Answer in English.
         
         Output Format: Q1? Q2? Q3?
-        """
+        """,
+            'hi': f"""
+        इस चिकित्सा पाठ को पढ़ें: "{short_context}"
         
+        कार्य: उपयोगकर्ता द्वारा पूछे जा सकने वाले 3 विशिष्ट अनुवर्ती प्रश्न बनाएं।
+        नियम:
+        1. प्रश्न पाठ के बारे में होने चाहिए।
+        2. "और बताओ" या "समझाओ" जैसे सामान्य वाक्यांश का उपयोग न करें।
+        3. उन्हें पूर्ण प्रश्न बनाएं।
+        4. हिंदी में उत्तर दें।
+        
+        आउटपुट प्रारूप: Q1? Q2? Q3?
+        """,
+            'gu': f"""
+        આ તબીબી ટેક્સ્ટ વાંચો: "{short_context}"
+        
+        કાર્ય: વપરાશકર્તા પૂછી શકે તેવા 3 ચોક્કસ અનુવર્તી પ્રશ્નો બનાવો.
+        નિયમો:
+        1. પ્રશ્નો ટેક્સ્ટ વિશે હોવા જોઈએ.
+        2. "વધુ કહો" અથવા "સમજાવો" જેવા સામાન્ય શબ્દસમૂહનો ઉપયોગ ન કરો.
+        3. તેમને સંપૂર્ણ પ્રશ્નો બનાવો.
+        4. ગુજરાતીમાં જવાબ આપો.
+        
+        આઉટપુટ ફોર્મેટ: Q1? Q2? Q3?
+        """
+        }
+        
+        prompt = prompts.get(lang, prompts['en'])
         results = generator(prompt, max_length=100, do_sample=True, temperature=0.95)
         raw_text = results[0]['generated_text'].strip()
         
@@ -96,19 +260,40 @@ def generate_ai_recommendations(topic_text, generator):
         clean_recs = []
         for p in parts:
             clean_q = re.sub(r'^[0-9\.\-\s]+', '', p).strip()
-            if len(clean_q) > 10 and "tell me more" not in clean_q.lower():
-                clean_recs.append(clean_q + "?")
+            if len(clean_q) > 10:
+                # Language-specific generic phrase checks
+                generic_phrases = {
+                    'en': ["tell me more", "explain"],
+                    'hi': ["और बताओ", "समझाओ"],
+                    'gu': ["વધુ કહો", "સમજાવો"]
+                }
+                phrases = generic_phrases.get(lang, generic_phrases['en'])
+                if not any(phrase in clean_q.lower() for phrase in phrases):
+                    clean_recs.append(clean_q + "?")
         
         clean_recs = list(set(clean_recs))
         
+        # Language-specific fallback recommendations
+        fallbacks = {
+            'en': ["What are the benefits?", "Are there any side effects?", "Who can donate?"],
+            'hi': ["लाभ क्या हैं?", "क्या कोई दुष्प्रभाव हैं?", "रक्तदान कौन कर सकता है?"],
+            'gu': ["લાભો શું છે?", "શું કોઈ આડઅસરો છે?", "રક્તદાન કોણ કરી શકે છે?"]
+        }
+        
         if len(clean_recs) < 3:
-            clean_recs.append("What are the benefits?")
-            clean_recs.append("Are there any side effects?")
+            fallback = fallbacks.get(lang, fallbacks['en'])
+            clean_recs.extend(fallback)
             
         return clean_recs[:3]
     except Exception as e:
         print(f"Rec Gen Error: {e}")
-        return ["Who can donate?", "Is donation safe?", "How often can I donate?"]
+        # Language-specific default recommendations
+        defaults = {
+            'en': ["Who can donate?", "Is donation safe?", "How often can I donate?"],
+            'hi': ["रक्तदान कौन कर सकता है?", "क्या दान सुरक्षित है?", "मैं कितनी बार दान कर सकता हूं?"],
+            'gu': ["રક્તદાન કોણ કરી શકે છે?", "શું દાન સુરક્ષિત છે?", "હું કેટલી વાર દાન કરી શકું?"]
+        }
+        return defaults.get(lang, defaults['en'])
 
 def get_blood_data_dynamic(city):
     banks = []
@@ -492,41 +677,88 @@ def chat_api(request):
             
             if not question: return JsonResponse({'error': 'Empty'}, status=400)
 
+            # Detect language of the question
+            detected_lang = detect_language(question)
+            lang_instruction = get_language_instruction(detected_lang)
+            lang_templates = get_language_response_templates(detected_lang)
+            
             # Load the selected model
             generator = load_model_if_needed(model_name)
             
             q_lower = question.lower()
             intent = "UNKNOWN"
 
-            # Check for "Contextless" inputs
-            if len(question) < 5 or q_lower in ["tell me more", "explain", "explain more", "yes", "no"]:
+            # Check for "Contextless" inputs (language-aware)
+            contextless_phrases = {
+                'en': ["tell me more", "explain", "explain more", "yes", "no"],
+                'hi': ["और बताओ", "समझाओ", "हाँ", "नहीं", "हां"],
+                'gu': ["વધુ કહો", "સમજાવો", "હા", "ના"]
+            }
+            
+            is_contextless = len(question) < 5
+            if not is_contextless:
+                phrases = contextless_phrases.get(detected_lang, contextless_phrases['en'])
+                is_contextless = any(phrase in q_lower for phrase in phrases)
+            
+            if is_contextless:
                 return JsonResponse({
-                    'answer': "I need a little more detail. What specific topic would you like me to explain more about? (e.g., 'Explain more about age limits')", 
+                    'answer': lang_templates['contextless'], 
                     'source': 'System', 
                     'confidence': 1.0,
-                    'recommendations': ["Who can donate blood?", "What are the risks?", "Locations near me"]
+                    'recommendations': lang_templates['recommendations'],
+                    'detected_language': detected_lang
                 })
 
-            # STRICT CONCEPT FILTER
-            concept_keywords = [
-                "what", "why", "how", "who", "risk", "benefit", "safe", "eligible", 
-                "age", "limit", "weight", "process", "procedure", "explain", "define", 
-                "can i", "should i", "maximum", "minimum"
-            ]
+            # STRICT CONCEPT FILTER (language-aware keywords)
+            concept_keywords = {
+                'en': ["what", "why", "how", "who", "risk", "benefit", "safe", "eligible", 
+                       "age", "limit", "weight", "process", "procedure", "explain", "define", 
+                       "can i", "should i", "maximum", "minimum"],
+                'hi': ["क्या", "क्यों", "कैसे", "कौन", "जोखिम", "लाभ", "सुरक्षित", "योग्य",
+                       "उम्र", "सीमा", "वजन", "प्रक्रिया", "समझाओ", "परिभाषा", "कर सकता", 
+                       "अधिकतम", "न्यूनतम"],
+                'gu': ["શું", "શા માટે", "કેવી રીતે", "કોણ", "જોખમ", "લાભ", "સુરક્ષિત", "યોગ્ય",
+                       "ઉંમર", "મર્યાદા", "વજન", "પ્રક્રિયા", "સમજાવો", "વ્યાખ્યા", "કરી શકું",
+                       "મહત્તમ", "ન્યૂનતમ"]
+            }
             
-            if any(word in q_lower for word in concept_keywords):
+            keywords = concept_keywords.get(detected_lang, concept_keywords['en'])
+            if any(word in q_lower for word in keywords):
                 intent = "EXPLAIN"
             
-            # AI ROUTER
+            # AI ROUTER (language-aware)
             if intent == "UNKNOWN":
+                router_examples = {
+                    'en': [
+                        '"Find blood bank" -> SEARCH',
+                        '"Locations in Surat" -> SEARCH',
+                        '"Donate near me" -> SEARCH',
+                        '"Blood donation camps" -> SEARCH',
+                        '"What is hemoglobin?" -> EXPLAIN',
+                        '"Max age for donation" -> EXPLAIN'
+                    ],
+                    'hi': [
+                        '"रक्त बैंक खोजें" -> SEARCH',
+                        '"सूरत में स्थान" -> SEARCH',
+                        '"मेरे पास दान करें" -> SEARCH',
+                        '"रक्तदान शिविर" -> SEARCH',
+                        '"हीमोग्लोबिन क्या है?" -> EXPLAIN',
+                        '"दान की अधिकतम उम्र" -> EXPLAIN'
+                    ],
+                    'gu': [
+                        '"રક્ત બેંક શોધો" -> SEARCH',
+                        '"સુરતમાં સ્થાનો" -> SEARCH',
+                        '"મારી નજીક દાન કરો" -> SEARCH',
+                        '"રક્તદાન શિબિર" -> SEARCH',
+                        '"હીમોગ્લોબિન શું છે?" -> EXPLAIN',
+                        '"દાન માટે મહત્તમ ઉંમર" -> EXPLAIN'
+                    ]
+                }
+                
+                examples = router_examples.get(detected_lang, router_examples['en'])
                 router_prompt = f"""
                 Classify user intent.
-                "Find blood bank" -> SEARCH
-                "Locations in Surat" -> SEARCH
-                "Donate near me" -> SEARCH
-                "Blood donation camps" -> SEARCH
-                "What is hemoglobin?" -> EXPLAIN
-                "Max age for donation" -> EXPLAIN
+                {chr(10).join(examples)}
                 
                 Question: "{question}"
                 Answer (SEARCH or EXPLAIN):
@@ -534,29 +766,64 @@ def chat_api(request):
                 router_out = generator(router_prompt, max_length=5, do_sample=False)
                 intent = router_out[0]['generated_text'].strip().upper()
             
-            print(f"User: {question} | Intent: {intent} | Model: {model_name}")
+            print(f"User: {question} | Language: {detected_lang} | Intent: {intent} | Model: {model_name}")
 
             # PATH A: SEARCH
             if "SEARCH" in intent:
                 city = "Ahmedabad"
-                if 'surat' in q_lower: city = "Surat"
-                elif 'vadodara' in q_lower: city = "Vadodara"
+                city_keywords = {
+                    'en': {'surat': 'Surat', 'vadodara': 'Vadodara'},
+                    'hi': {'सूरत': 'Surat', 'वडोदरा': 'Vadodara'},
+                    'gu': {'સુરત': 'Surat', 'વડોદરા': 'Vadodara'}
+                }
+                
+                keywords = city_keywords.get(detected_lang, city_keywords['en'])
+                for keyword, city_name in keywords.items():
+                    if keyword.lower() in q_lower:
+                        city = city_name
+                        break
                 
                 banks, camps = get_blood_data_dynamic(city)
                 rec_context = f"Blood banks in {city}: " + (banks[0]['name'] if banks else "General info")
-                recommendations = generate_ai_recommendations(rec_context, generator)
+                recommendations = generate_ai_recommendations(rec_context, generator, detected_lang)
 
-                html = f"""<div class="space-y-4"><div class="text-sm text-gray-600 mb-2">Latest locations in <b>{city.title()}</b>.</div>"""
+                # Language-specific labels
+                labels = {
+                    'en': {
+                        'title': f'Latest locations in <b>{city.title()}</b>.',
+                        'banks': '🏥 Blood Banks',
+                        'camps': '📅 Camps',
+                        'visit': 'Visit Link',
+                        'details': 'Details'
+                    },
+                    'hi': {
+                        'title': f'<b>{city.title()}</b> में नवीनतम स्थान।',
+                        'banks': '🏥 रक्त बैंक',
+                        'camps': '📅 शिविर',
+                        'visit': 'लिंक देखें',
+                        'details': 'विवरण'
+                    },
+                    'gu': {
+                        'title': f'<b>{city.title()}</b> માં નવીનતમ સ્થાનો।',
+                        'banks': '🏥 રક્ત બેંકો',
+                        'camps': '📅 શિબિરો',
+                        'visit': 'લિંક જુઓ',
+                        'details': 'વિગતો'
+                    }
+                }
+                
+                lang_labels = labels.get(detected_lang, labels['en'])
+                html = f"""<div class="space-y-4"><div class="text-sm text-gray-600 mb-2">{lang_labels['title']}</div>"""
                 
                 if banks:
-                    html += f'<div class="font-bold text-gray-800 border-b pb-1 mb-2">🏥 Blood Banks</div>'
+                    html += f'<div class="font-bold text-gray-800 border-b pb-1 mb-2">{lang_labels["banks"]}</div>'
                     for i, b in enumerate(banks):
-                        html += f'<div class="bg-white p-3 mb-2 border rounded shadow-sm"><b>{i+1}. {b["name"]}</b><br><span class="text-xs">{b["snippet"][:120]}...</span><br><a href="{b["source_link"]}" target="_blank" class="text-xs text-blue-600 underline">Visit Link</a></div>'
+                        html += f'<div class="bg-white p-3 mb-2 border rounded shadow-sm"><b>{i+1}. {b["name"]}</b><br><span class="text-xs">{b["snippet"][:120]}...</span><br><a href="{b["source_link"]}" target="_blank" class="text-xs text-blue-600 underline">{lang_labels["visit"]}</a></div>'
                 
                 if camps:
-                    html += f'<div class="font-bold text-gray-800 border-b pb-1 mt-4 mb-2">📅 Camps</div>'
+                    html += f'<div class="font-bold text-gray-800 border-b pb-1 mt-4 mb-2">{lang_labels["camps"]}</div>'
                     for i, c in enumerate(camps):
-                        html += f'<div class="bg-red-50 p-3 mb-2 border border-red-100 rounded"><b>{i+1}. {c["name"]}</b><br><span class="text-xs">{c["snippet"][:120]}...</span><br><a href="{c["source_link"]}" target="_blank" class="text-xs text-red-600 underline">Details</a></div>'
+                        html += f'<div class="bg-red-50 p-3 mb-2 border border-red-100 rounded"><b>{i+1}. {c["name"]}</b><br><span class="text-xs">{c["snippet"][:120]}...</span><br><a href="{c["source_link"]}" target="_blank" class="text-xs text-red-600 underline">{lang_labels["details"]}</a></div>'
                 html += "</div>"
                 
                 return JsonResponse({
@@ -564,42 +831,91 @@ def chat_api(request):
                     'source': 'Tavily Search',
                     'confidence': 1.0,
                     'recommendations': recommendations,
-                    'model_used': AVAILABLE_MODELS[model_name]['name']
+                    'model_used': AVAILABLE_MODELS[model_name]['name'],
+                    'detected_language': detected_lang
                 })
 
             # PATH B: EXPLAIN
             else:
-                explain_prompt = f"""
-            You are a medical assistant AI. Provide an accurate, dynamic, and concise answer based on the user's question.
+                # First, check knowledge base for common questions
+                kb_answer = get_knowledge_base_answer(question, detected_lang)
+                
+                if kb_answer:
+                    # Use knowledge base answer
+                    answer_text = kb_answer
+                    recommendations = generate_ai_recommendations(answer_text, generator, detected_lang)
+                else:
+                    # Use AI generation with improved prompts
+                    explain_prompts = {
+                        'en': f"""Answer this question about blood donation in English clearly and accurately.
 
-            Rules:
-            1. Do not repeat the question.
-            2. Do not hallucinate facts.
-            3. Provide globally accepted medical guidelines only when necessary.
-            4. If the question is vague, request clarification.
-            5. Answer in simple, human-readable language.
+Question: "{question}"
 
-            Question: "{question}"
-            Answer:
-            """
+Answer in English:""",
+                        'hi': f"""रक्तदान के बारे में इस प्रश्न का उत्तर हिंदी में स्पष्ट और सटीक रूप से दें।
 
-                res = generator(
-                    explain_prompt,
-                    max_length=256,
-                    do_sample=True,
-                    temperature=0.8,
-                    top_p=0.95
-                )
+प्रश्न: "{question}"
 
-                answer_text = res[0]['generated_text'].strip()
-                recommendations = generate_ai_recommendations(answer_text, generator)
+हिंदी में उत्तर दें:""",
+                        'gu': f"""રક્તદાન વિશે આ પ્રશ્નનો જવાબ ગુજરાતીમાં સ્પષ્ટ અને સચોટ રીતે આપો.
+
+પ્રશ્ન: "{question}"
+
+ગુજરાતીમાં જવાબ આપો:"""
+                    }
+                    
+                    # Use language-specific prompt
+                    explain_prompt = explain_prompts.get(detected_lang, explain_prompts['en'])
+
+                    res = generator(
+                        explain_prompt,
+                        max_length=512,
+                        do_sample=True,
+                        temperature=0.7,
+                        top_p=0.9,
+                        num_return_sequences=1
+                    )
+
+                    answer_text = res[0]['generated_text'].strip()
+                    
+                    # Clean up the answer - remove any prompt remnants
+                    if detected_lang == 'hi':
+                        # Remove common Hindi prompt artifacts
+                        answer_text = re.sub(r'^(उत्तर|जवाब|Answer|answer|प्रश्न|Question)[:\s]*', '', answer_text, flags=re.IGNORECASE)
+                        answer_text = re.sub(r'^[:\s]*', '', answer_text)
+                    elif detected_lang == 'gu':
+                        # Remove common Gujarati prompt artifacts
+                        answer_text = re.sub(r'^(જવાબ|Answer|answer|પ્રશ્ન|Question)[:\s]*', '', answer_text, flags=re.IGNORECASE)
+                        answer_text = re.sub(r'^[:\s]*', '', answer_text)
+                    else:
+                        # Remove common English prompt artifacts
+                        answer_text = re.sub(r'^(Answer|answer|Question)[:\s]*', '', answer_text, flags=re.IGNORECASE)
+                        answer_text = re.sub(r'^[:\s]*', '', answer_text)
+                    
+                    # If answer is still empty or too short, use knowledge base or fallback
+                    if not answer_text or len(answer_text.strip()) < 10:
+                        # Try to find a general answer from KB
+                        if 'benefit' in question.lower() or 'लाभ' in question or 'લાભ' in question:
+                            answer_text = BLOOD_DONATION_KB.get(detected_lang, BLOOD_DONATION_KB['en']).get('benefits', '')
+                        elif 'side effect' in question.lower() or 'दुष्प्रभाव' in question or 'આડઅસર' in question:
+                            answer_text = BLOOD_DONATION_KB.get(detected_lang, BLOOD_DONATION_KB['en']).get('side effects', '')
+                        else:
+                            fallback_answers = {
+                                'en': "I understand your question about blood donation. Could you please provide more specific details so I can give you a more accurate answer?",
+                                'hi': "मैं रक्तदान के बारे में आपके प्रश्न को समझता हूं। कृपया अधिक विशिष्ट विवरण प्रदान करें ताकि मैं आपको अधिक सटीक उत्तर दे सकूं?",
+                                'gu': "હું રક્તદાન વિશે તમારો પ્રશ્ન સમજું છું. કૃપા કરીને વધુ ચોક્કસ વિગતો પ્રદાન કરો જેથી હું તમને વધુ સચોટ જવાબ આપી શકું?"
+                            }
+                            answer_text = fallback_answers.get(detected_lang, fallback_answers['en'])
+                    
+                    recommendations = generate_ai_recommendations(answer_text, generator, detected_lang)
 
                 return JsonResponse({
                     'answer': answer_text,
                     'source': 'Generative AI',
                     'confidence': 1.0,
                     'recommendations': recommendations,
-                    'model_used': AVAILABLE_MODELS[model_name]['name']
+                    'model_used': AVAILABLE_MODELS[model_name]['name'],
+                    'detected_language': detected_lang
                 })
 
         except Exception as e:

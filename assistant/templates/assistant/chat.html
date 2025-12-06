@@ -628,6 +628,24 @@
             questionInput.style.height = (questionInput.scrollHeight) + 'px';
         }
 
+        // Language Detection Function
+        function detectLanguage(text) {
+            if (!text || !text.trim()) return 'en-US';
+            
+            // Check for Gujarati script (U+0A80 to U+0AFF)
+            if (text.match(/[\u0A80-\u0AFF]/)) {
+                return 'gu-IN';
+            }
+            
+            // Check for Hindi/Devanagari script (U+0900 to U+097F)
+            if (text.match(/[\u0900-\u097F]/)) {
+                return 'hi-IN';
+            }
+            
+            // Default to English
+            return 'en-US';
+        }
+
         // Send Message
         async function sendMessage() {
             const q = questionInput.value.trim();
@@ -639,9 +657,8 @@
                 return;
             }
 
-            if (q.match(/[\u0900-\u097F]/)) detectedLanguage = 'hi-IN';
-            else if (q.match(/[\u00C0-\u017F]/)) detectedLanguage = 'es-ES';
-            else detectedLanguage = 'en-US';
+            // Detect language dynamically
+            detectedLanguage = detectLanguage(q);
 
             document.querySelectorAll('.rec-container').forEach(e => e.style.display = 'none');
 
@@ -676,6 +693,13 @@
 
                 if (!response.ok) throw new Error('Network error');
                 const data = await response.json();
+                
+                // Update detected language from server response if available
+                if (data.detected_language) {
+                    const langMap = {'en': 'en-US', 'hi': 'hi-IN', 'gu': 'gu-IN'};
+                    detectedLanguage = langMap[data.detected_language] || detectedLanguage;
+                }
+                
                 appendMessage(chatBox, 'Assistant', data.answer, 'text-gray-800', data.confidence, detectedLanguage, data.recommendations, false, 0, 0, data.model_used);
 
             } catch (error) {
